@@ -1,7 +1,7 @@
 var path = require('path')
 
 const baseConfig = {
-    mode: 'development',
+    mode: 'production',
     output: {
         path: __dirname,
         filename: 'build/[name].js',
@@ -9,6 +9,7 @@ const baseConfig = {
         library: {
             type: 'umd',
         },
+        chunkFormat: false,
     },
     resolve: {
         extensions: ['.ts', '.tsx', '.js'],
