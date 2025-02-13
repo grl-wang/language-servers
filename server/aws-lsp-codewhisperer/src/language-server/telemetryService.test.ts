@@ -7,12 +7,18 @@ import {
     IamCredentials,
     Logging,
     Telemetry,
+    Workspace,
+    SDKInitializator,
+    SDKClientConstructorV2,
+    SDKClientConstructorV3,
 } from '@aws/language-server-runtimes/server-interface'
 import { UserContext, OptOutPreference } from '../client/token/codewhispererbearertokenclient'
 import { CodeWhispererSession } from './session/sessionManager'
 import sinon from 'ts-sinon'
 import { BUILDER_ID_START_URL } from './constants'
 import { ChatInteractionType } from './telemetry/types'
+import { Service } from 'aws-sdk'
+import { ServiceConfigurationOptions } from 'aws-sdk/lib/service'
 
 class MockCredentialsProvider implements CredentialsProvider {
     private mockIamCredentials: IamCredentials | undefined
@@ -51,11 +57,15 @@ describe('TelemetryService', () => {
     let clock: sinon.SinonFakeTimers
     let telemetryService: TelemetryService
     let mockCredentialsProvider: MockCredentialsProvider
+    const mockAwsQRegion: string = 'mock-aws-q-region'
+    const mockAwsQEndpointUrl: string = 'mock-aws-q-endpoint-url'
+
     const logging: Logging = {
         log: (message: string) => {
             console.log(message)
         },
-    }
+    } as Logging
+    const mockWorkspace = {} as unknown as Workspace
     const mockSession: Partial<CodeWhispererSession> = {
         codewhispererSessionId: 'test-session-id',
         responseContext: {
@@ -88,6 +98,18 @@ describe('TelemetryService', () => {
         },
     }
 
+    const mockSdkRuntimeConfigurator: SDKInitializator = Object.assign(
+        // Default callable function for v3 clients
+        <T, P>(Ctor: SDKClientConstructorV3<T, P>, current_config: P): T => new Ctor({ ...current_config }),
+        // Property for v2 clients
+        {
+            v2: <T extends Service, P extends ServiceConfigurationOptions>(
+                Ctor: SDKClientConstructorV2<T, P>,
+                current_config: P
+            ): T => new Ctor({ ...current_config }),
+        }
+    )
+
     beforeEach(() => {
         clock = sinon.useFakeTimers({
             now: 1483228800000,
@@ -105,7 +127,16 @@ describe('TelemetryService', () => {
     })
 
     it('updateUserContext updates the userContext property', () => {
-        telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', {} as Telemetry, logging)
+        telemetryService = new TelemetryService(
+            mockCredentialsProvider,
+            'bearer',
+            {} as Telemetry,
+            logging,
+            mockWorkspace,
+            mockAwsQRegion,
+            mockAwsQEndpointUrl,
+            mockSdkRuntimeConfigurator
+        )
         const mockUserContext: UserContext = {
             clientId: 'aaaabbbbccccdddd',
             ideCategory: 'ECLIPSE',
@@ -119,7 +150,16 @@ describe('TelemetryService', () => {
     })
 
     it('updateOptOutPreference updates the optOutPreference property', () => {
-        telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', {} as Telemetry, logging)
+        telemetryService = new TelemetryService(
+            mockCredentialsProvider,
+            'bearer',
+            {} as Telemetry,
+            logging,
+            mockWorkspace,
+            mockAwsQRegion,
+            mockAwsQEndpointUrl,
+            mockSdkRuntimeConfigurator
+        )
         const mockOptOutPreference: OptOutPreference = 'OPTIN'
         telemetryService.updateOptOutPreference(mockOptOutPreference)
 
@@ -127,14 +167,32 @@ describe('TelemetryService', () => {
     })
 
     it('updateEnableTelemetryEventsToDestination updates the enableTelemetryEventsToDestination property', () => {
-        telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', {} as Telemetry, logging)
+        telemetryService = new TelemetryService(
+            mockCredentialsProvider,
+            'bearer',
+            {} as Telemetry,
+            logging,
+            mockWorkspace,
+            mockAwsQRegion,
+            mockAwsQEndpointUrl,
+            mockSdkRuntimeConfigurator
+        )
         telemetryService.updateEnableTelemetryEventsToDestination(true)
 
         sinon.assert.match((telemetryService as any).enableTelemetryEventsToDestination, true)
     })
 
     it('getSuggestionState fetches the suggestion state from CodeWhispererSession', () => {
-        telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', {} as Telemetry, logging)
+        telemetryService = new TelemetryService(
+            mockCredentialsProvider,
+            'bearer',
+            {} as Telemetry,
+            logging,
+            mockWorkspace,
+            mockAwsQRegion,
+            mockAwsQEndpointUrl,
+            mockSdkRuntimeConfigurator
+        )
         const getSuggestionState = (telemetryService as any).getSuggestionState.bind(telemetryService)
         let session = {
             getAggregatedUserTriggerDecision: () => {
@@ -175,7 +233,16 @@ describe('TelemetryService', () => {
     })
 
     it('should not emit user trigger decision if login is invalid (IAM)', () => {
-        telemetryService = new TelemetryService(mockCredentialsProvider, 'iam', telemetry, logging)
+        telemetryService = new TelemetryService(
+            mockCredentialsProvider,
+            'iam',
+            telemetry,
+            logging,
+            mockWorkspace,
+            mockAwsQRegion,
+            mockAwsQEndpointUrl,
+            mockSdkRuntimeConfigurator
+        )
         const invokeSendTelemetryEventStub: sinon.SinonStub = sinon.stub(telemetryService, 'sendTelemetryEvent' as any)
 
         telemetryService.emitUserTriggerDecision(mockSession as CodeWhispererSession)
@@ -189,7 +256,16 @@ describe('TelemetryService', () => {
                 startUrl: BUILDER_ID_START_URL,
             },
         })
-        telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', telemetry, logging)
+        telemetryService = new TelemetryService(
+            mockCredentialsProvider,
+            'bearer',
+            telemetry,
+            logging,
+            mockWorkspace,
+            mockAwsQRegion,
+            mockAwsQEndpointUrl,
+            mockSdkRuntimeConfigurator
+        )
         const invokeSendTelemetryEventStub: sinon.SinonStub = sinon.stub(telemetryService, 'sendTelemetryEvent' as any)
         telemetryService.updateOptOutPreference('OPTOUT')
 
@@ -199,7 +275,16 @@ describe('TelemetryService', () => {
     })
 
     it('should handle SSO connection type change at runtime', () => {
-        telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', telemetry, logging)
+        telemetryService = new TelemetryService(
+            mockCredentialsProvider,
+            'bearer',
+            telemetry,
+            logging,
+            mockWorkspace,
+            mockAwsQRegion,
+            mockAwsQEndpointUrl,
+            mockSdkRuntimeConfigurator
+        )
         const sendTelemetryEventStub: sinon.SinonStub = sinon
             .stub(telemetryService, 'sendTelemetryEvent' as any)
             .returns(Promise.resolve())
@@ -255,7 +340,16 @@ describe('TelemetryService', () => {
                 startUrl: 'idc-start-url',
             },
         })
-        telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', telemetry, logging)
+        telemetryService = new TelemetryService(
+            mockCredentialsProvider,
+            'bearer',
+            telemetry,
+            logging,
+            mockWorkspace,
+            mockAwsQRegion,
+            mockAwsQEndpointUrl,
+            mockSdkRuntimeConfigurator
+        )
         telemetryService.updateEnableTelemetryEventsToDestination(true)
         const invokeSendTelemetryEventStub: sinon.SinonStub = sinon
             .stub(telemetryService, 'sendTelemetryEvent' as any)
@@ -302,7 +396,16 @@ describe('TelemetryService', () => {
                 startUrl: BUILDER_ID_START_URL,
             },
         })
-        telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', telemetry, logging)
+        telemetryService = new TelemetryService(
+            mockCredentialsProvider,
+            'bearer',
+            telemetry,
+            logging,
+            mockWorkspace,
+            mockAwsQRegion,
+            mockAwsQEndpointUrl,
+            mockSdkRuntimeConfigurator
+        )
         telemetryService.updateEnableTelemetryEventsToDestination(false)
         telemetryService.updateOptOutPreference('OPTOUT')
         telemetryService.emitUserTriggerDecision(mockSession as CodeWhispererSession)
@@ -323,7 +426,16 @@ describe('TelemetryService', () => {
                     startUrl: 'idc-start-url',
                 },
             })
-            telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', telemetry, logging)
+            telemetryService = new TelemetryService(
+                mockCredentialsProvider,
+                'bearer',
+                telemetry,
+                logging,
+                mockWorkspace,
+                mockAwsQRegion,
+                mockAwsQEndpointUrl,
+                mockSdkRuntimeConfigurator
+            )
             invokeSendTelemetryEventStub = sinon
                 .stub(telemetryService, 'sendTelemetryEvent' as any)
                 .returns(Promise.resolve())
@@ -395,7 +507,16 @@ describe('TelemetryService', () => {
                     startUrl: BUILDER_ID_START_URL,
                 },
             })
-            telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', {} as Telemetry, logging)
+            telemetryService = new TelemetryService(
+                mockCredentialsProvider,
+                'bearer',
+                {} as Telemetry,
+                logging,
+                mockWorkspace,
+                mockAwsQRegion,
+                mockAwsQEndpointUrl,
+                mockSdkRuntimeConfigurator
+            )
             telemetryService.updateEnableTelemetryEventsToDestination(false)
             telemetryService.updateOptOutPreference('OPTOUT')
             telemetryService.emitChatInteractWithMessage(metric, {
@@ -423,7 +544,16 @@ describe('TelemetryService', () => {
         })
 
         it('should not send InteractWithMessage when credentialsType is IAM', () => {
-            telemetryService = new TelemetryService(mockCredentialsProvider, 'iam', telemetry, logging)
+            telemetryService = new TelemetryService(
+                mockCredentialsProvider,
+                'iam',
+                telemetry,
+                logging,
+                mockWorkspace,
+                mockAwsQRegion,
+                mockAwsQEndpointUrl,
+                mockSdkRuntimeConfigurator
+            )
             invokeSendTelemetryEventStub = sinon.stub(telemetryService, 'sendTelemetryEvent' as any)
             const metric = {
                 cwsprChatMessageId: 'message123',
@@ -446,7 +576,16 @@ describe('TelemetryService', () => {
                     startUrl: BUILDER_ID_START_URL,
                 },
             })
-            telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', telemetry, logging)
+            telemetryService = new TelemetryService(
+                mockCredentialsProvider,
+                'bearer',
+                telemetry,
+                logging,
+                mockWorkspace,
+                mockAwsQRegion,
+                mockAwsQEndpointUrl,
+                mockSdkRuntimeConfigurator
+            )
             invokeSendTelemetryEventStub = sinon.stub(telemetryService, 'sendTelemetryEvent' as any)
             telemetryService.updateOptOutPreference('OPTOUT')
             const metric = {
@@ -514,7 +653,16 @@ describe('TelemetryService', () => {
                 startUrl: 'idc-start-url',
             },
         })
-        telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', telemetry, logging)
+        telemetryService = new TelemetryService(
+            mockCredentialsProvider,
+            'bearer',
+            telemetry,
+            logging,
+            mockWorkspace,
+            mockAwsQRegion,
+            mockAwsQEndpointUrl,
+            mockSdkRuntimeConfigurator
+        )
         const invokeSendTelemetryEventStub: sinon.SinonStub = sinon
             .stub(telemetryService, 'sendTelemetryEvent' as any)
             .returns(Promise.resolve())
@@ -553,7 +701,16 @@ describe('TelemetryService', () => {
                 startUrl: BUILDER_ID_START_URL,
             },
         })
-        telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', telemetry, logging)
+        telemetryService = new TelemetryService(
+            mockCredentialsProvider,
+            'bearer',
+            telemetry,
+            logging,
+            mockWorkspace,
+            mockAwsQRegion,
+            mockAwsQEndpointUrl,
+            mockSdkRuntimeConfigurator
+        )
         telemetryService.updateOptOutPreference('OPTOUT')
         telemetryService.updateEnableTelemetryEventsToDestination(false)
 
@@ -580,7 +737,16 @@ describe('TelemetryService', () => {
                 startUrl: 'idc-start-url',
             },
         })
-        telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', {} as Telemetry, logging)
+        telemetryService = new TelemetryService(
+            mockCredentialsProvider,
+            'bearer',
+            {} as Telemetry,
+            logging,
+            mockWorkspace,
+            mockAwsQRegion,
+            mockAwsQEndpointUrl,
+            mockSdkRuntimeConfigurator
+        )
         const invokeSendTelemetryEventStub: sinon.SinonStub = sinon
             .stub(telemetryService, 'sendTelemetryEvent' as any)
             .returns(Promise.resolve())
@@ -623,7 +789,16 @@ describe('TelemetryService', () => {
                 startUrl: 'idc-start-url',
             },
         })
-        telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', telemetry, logging)
+        telemetryService = new TelemetryService(
+            mockCredentialsProvider,
+            'bearer',
+            telemetry,
+            logging,
+            mockWorkspace,
+            mockAwsQRegion,
+            mockAwsQEndpointUrl,
+            mockSdkRuntimeConfigurator
+        )
         telemetryService.updateEnableTelemetryEventsToDestination(true)
         const invokeSendTelemetryEventStub: sinon.SinonStub = sinon
             .stub(telemetryService, 'sendTelemetryEvent' as any)
@@ -667,7 +842,16 @@ describe('TelemetryService', () => {
                 startUrl: BUILDER_ID_START_URL,
             },
         })
-        telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', telemetry, logging)
+        telemetryService = new TelemetryService(
+            mockCredentialsProvider,
+            'bearer',
+            telemetry,
+            logging,
+            mockWorkspace,
+            mockAwsQRegion,
+            mockAwsQEndpointUrl,
+            mockSdkRuntimeConfigurator
+        )
         telemetryService.updateEnableTelemetryEventsToDestination(false)
         telemetryService.updateOptOutPreference('OPTOUT')
         telemetryService.emitChatUserModificationEvent({
@@ -693,7 +877,16 @@ describe('TelemetryService', () => {
                     startUrl: 'idc-start-url',
                 },
             })
-            telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', telemetry, logging)
+            telemetryService = new TelemetryService(
+                mockCredentialsProvider,
+                'bearer',
+                telemetry,
+                logging,
+                mockWorkspace,
+                mockAwsQRegion,
+                mockAwsQEndpointUrl,
+                mockSdkRuntimeConfigurator
+            )
             invokeSendTelemetryEventStub = sinon
                 .stub(telemetryService, 'sendTelemetryEvent' as any)
                 .returns(Promise.resolve())
@@ -781,7 +974,16 @@ describe('TelemetryService', () => {
                     startUrl: BUILDER_ID_START_URL,
                 },
             })
-            telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', {} as Telemetry, logging)
+            telemetryService = new TelemetryService(
+                mockCredentialsProvider,
+                'bearer',
+                {} as Telemetry,
+                logging,
+                mockWorkspace,
+                mockAwsQRegion,
+                mockAwsQEndpointUrl,
+                mockSdkRuntimeConfigurator
+            )
             telemetryService.updateOptOutPreference('OPTOUT')
             telemetryService.updateEnableTelemetryEventsToDestination(false)
             telemetryService.emitChatAddMessage(
@@ -829,7 +1031,16 @@ describe('TelemetryService', () => {
         })
 
         it('should not send ChatAddMessage when credentialsType is IAM', () => {
-            telemetryService = new TelemetryService(mockCredentialsProvider, 'iam', telemetry, logging)
+            telemetryService = new TelemetryService(
+                mockCredentialsProvider,
+                'iam',
+                telemetry,
+                logging,
+                mockWorkspace,
+                mockAwsQRegion,
+                mockAwsQEndpointUrl,
+                mockSdkRuntimeConfigurator
+            )
             invokeSendTelemetryEventStub = sinon.stub(telemetryService, 'sendTelemetryEvent' as any)
             telemetryService.emitChatAddMessage(
                 {
@@ -848,7 +1059,16 @@ describe('TelemetryService', () => {
                     startUrl: BUILDER_ID_START_URL,
                 },
             })
-            telemetryService = new TelemetryService(mockCredentialsProvider, 'bearer', telemetry, logging)
+            telemetryService = new TelemetryService(
+                mockCredentialsProvider,
+                'bearer',
+                telemetry,
+                logging,
+                mockWorkspace,
+                mockAwsQRegion,
+                mockAwsQEndpointUrl,
+                mockSdkRuntimeConfigurator
+            )
             invokeSendTelemetryEventStub = sinon.stub(telemetryService, 'sendTelemetryEvent' as any)
             telemetryService.updateOptOutPreference('OPTOUT')
             telemetryService.emitChatAddMessage(

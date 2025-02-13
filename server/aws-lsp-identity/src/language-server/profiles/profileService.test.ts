@@ -11,10 +11,9 @@ import {
 import { normalizeParsedIniData } from '../../sharedConfig/saveKnownFiles'
 import { StubbedInstance, stubInterface } from 'ts-sinon'
 import { expect, use } from 'chai'
-import { AwsError } from '../../awsError'
-import { Observability } from '../utils'
+import { AwsError, Observability } from '@aws/lsp-core'
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 use(require('chai-as-promised'))
 
 let sut: ProfileService
@@ -145,7 +144,7 @@ describe('ProfileService', async () => {
                     settings: {
                         sso_region: 'us-west-1',
                         sso_start_url: 'http://newnowhere',
-                        sso_registration_scopes: ['x', 'y', 'z', 'sso:account:access'],
+                        sso_registration_scopes: ['x', 'y', 'z'],
                     },
                 },
             ],

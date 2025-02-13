@@ -1,15 +1,44 @@
 # Changelog
 
+## [0.1.0](https://github.com/aws/language-servers/compare/chat-client/v0.0.9...chat-client/v0.1.0) (2025-01-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* **chat-client:** trigger release of new major version ([#713](https://github.com/aws/language-servers/issues/713))
+
+### Added
+
+- Add new `DISCLAIMER_ACKNOWLEDGED` event to the chat client
+- Add new `disclaimerAcknowledged?: boolean` flag to the config
+- Add an acknowledgeable legal disclaimer to every tab based on the `disclaimerAcknowledged` flag
+
+### Changed
+
+- Update `@aws/chat-client-ui-types` to 0.1.0
+- Update `@aws/language-server-runtimes-types` to 0.1.0
+- Shortened legal text in the footer
+
+## [0.0.9] - 2024-11-20
+
+### Changed
+
+- Updated dependency: `@aws/mynah-ui` from 4.16.0 to 4.18.1.
+
 ## [0.0.8] - 2024-11-13
 
 ### Changed
-- Reverted dependency: `@aws/mynah-ui` from 4.18.0 to 4.16.0:
+
+- Reverted dependency: `@aws/mynah-ui` from 4.18.0 to 4.16.0.
 
 ## [0.0.7] - 2024-11-08
+
 ### Added
+
 - Add new `COPY_TO_CLIPBOARD` event to the chat client 
 
 ### Changed
+
 - Changed legal text in the footer
 - Update `@aws/chat-client-ui-types` to 0.0.8
 - Update `@aws/language-server-runtimes-types` to to 0.0.7

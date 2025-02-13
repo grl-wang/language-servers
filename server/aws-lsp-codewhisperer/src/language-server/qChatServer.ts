@@ -4,14 +4,39 @@ import { ChatSessionManagementService } from './chat/chatSessionManagementServic
 import { CLEAR_QUICK_ACTION, HELP_QUICK_ACTION } from './chat/quickActions'
 import { TelemetryService } from './telemetryService'
 import { getUserAgent, makeUserContextObject } from './utilities/telemetryUtils'
+import { DEFAULT_AWS_Q_REGION, DEFAULT_AWS_Q_ENDPOINT_URL } from '../constants'
+import { SDKInitializator } from '@aws/language-server-runtimes/server-interface'
 
 export const QChatServer =
-    (service: (credentialsProvider: CredentialsProvider) => ChatSessionManagementService): Server =>
+    (
+        service: (
+            credentialsProvider: CredentialsProvider,
+            awsQRegion: string,
+            awsQEndpointUrl: string,
+            sdkInitializator: SDKInitializator
+        ) => ChatSessionManagementService
+    ): Server =>
     features => {
-        const { chat, credentialsProvider, telemetry, logging, lsp, runtime } = features
+        const { chat, credentialsProvider, telemetry, logging, lsp, runtime, workspace, sdkInitializator } = features
 
-        const chatSessionManagementService: ChatSessionManagementService = service(credentialsProvider)
-        const telemetryService = new TelemetryService(credentialsProvider, 'bearer', telemetry, logging)
+        const awsQRegion = runtime.getConfiguration('AWS_Q_REGION') ?? DEFAULT_AWS_Q_REGION
+        const awsQEndpointUrl = runtime.getConfiguration('AWS_Q_ENDPOINT_URL') ?? DEFAULT_AWS_Q_ENDPOINT_URL
+        const chatSessionManagementService: ChatSessionManagementService = service(
+            credentialsProvider,
+            awsQRegion,
+            awsQEndpointUrl,
+            sdkInitializator
+        )
+        const telemetryService = new TelemetryService(
+            credentialsProvider,
+            'bearer',
+            telemetry,
+            logging,
+            workspace,
+            awsQRegion,
+            awsQEndpointUrl,
+            sdkInitializator
+        )
 
         const chatController = new ChatController(chatSessionManagementService, features, telemetryService)
 

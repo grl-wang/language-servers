@@ -1,6 +1,6 @@
 {
     "name": "@aws/lsp-codewhisperer",
-    "version": "0.0.17",
+    "version": "0.0.26",
     "description": "CodeWhisperer Language Server",
     "main": "out/index.js",
     "repository": {
@@ -12,12 +12,7 @@
     "engines": {
         "node": ">=18.0.0"
     },
-    "workspaces": [
-        "src.gen/@amzn/codewhisperer-streaming"
-    ],
     "scripts": {
-        "compile-streamingClient": "npm run build -w src.gen/@amzn/codewhisperer-streaming",
-        "precompile": "npm run compile-streamingClient",
         "compile": "tsc --build",
         "postcompile": "npm run copyServiceClient",
         "copyServiceClient": "copyfiles -u 1 --error ./src/client/sigv4/*.json out && copyfiles -u 1 --error ./src/client/token/*.json out",
@@ -32,10 +27,10 @@
         "postinstall": "node ./script/install_transitive_dep.js"
     },
     "dependencies": {
-        "@amzn/codewhisperer-streaming": "*",
+        "@amzn/codewhisperer-streaming": "file:../../core/codewhisperer-streaming/amzn-codewhisperer-streaming-1.0.0.tgz",
         "@aws-sdk/util-retry": "^3.374.0",
-        "@aws/chat-client-ui-types": "^0.0.8",
-        "@aws/language-server-runtimes": "^0.2.26",
+        "@aws/chat-client-ui-types": "^0.1.0",
+        "@aws/language-server-runtimes": "^0.2.34",
         "@gerhobbelt/gitignore-parser": "^0.2.0-9",
         "@smithy/node-http-handler": "^2.5.0",
         "adm-zip": "^0.5.10",
@@ -56,6 +51,7 @@
         "assert": "^2.1.0",
         "copyfiles": "^2.4.1",
         "mock-fs": "^5.2.0",
+        "sinon": "^19.0.2",
         "ts-loader": "^9.4.4",
         "ts-mocha": "^10.0.0",
         "ts-sinon": "^2.0.2",

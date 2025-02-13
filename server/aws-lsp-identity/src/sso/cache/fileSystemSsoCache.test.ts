@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 import mock = require('mock-fs')
 import { FileSystemSsoCache } from './fileSystemSsoCache'
 import { expect, use } from 'chai'
@@ -7,10 +8,10 @@ import { SsoClientRegistration } from './ssoCache'
 import { Logging, SsoSession, Telemetry } from '@aws/language-server-runtimes/server-interface'
 import { access } from 'fs/promises'
 import * as fs from 'fs'
-import { Observability } from '../../language-server/utils'
 import { StubbedInstance, stubInterface } from 'ts-sinon'
+import { Observability } from '@aws/lsp-core'
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+// eslint-disable-next-line
 use(require('chai-as-promised'))
 
 let sut: FileSystemSsoCache
@@ -39,6 +40,7 @@ const ssoSession: SsoSession = {
     settings: {
         sso_region: 'us-east-1',
         sso_start_url: 'https://nowhere',
+        sso_registration_scopes: ['codewhisperer:completions', 'codewhisperer:analysis'],
     },
 }
 
@@ -77,6 +79,7 @@ function createSsoSession(name: string): SsoSession {
         settings: {
             sso_region: 'us-east-1',
             sso_start_url: 'https://nowhere',
+            sso_registration_scopes: ['codewhisperer:completions', 'codewhisperer:analysis'],
         },
     }
 }

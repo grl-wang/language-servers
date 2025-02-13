@@ -11,7 +11,7 @@
         "serve:webpack": "NODE_ENV=development webpack serve"
     },
     "dependencies": {
-        "@aws/language-server-runtimes": "^0.2.26",
+        "@aws/language-server-runtimes": "^0.2.34",
         "@aws/lsp-json": "*",
         "@aws/lsp-yaml": "*"
     },
@@ -24,6 +24,6 @@
         "umd-compat-loader": "^2.1.2",
         "webpack": "^5.94.0",
         "webpack-cli": "^5.1.4",
-        "webpack-dev-server": "^5.0.4"
+        "webpack-dev-server": "^5.2.0"
     }
 }

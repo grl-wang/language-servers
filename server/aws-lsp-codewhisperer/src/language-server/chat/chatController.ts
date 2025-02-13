@@ -157,7 +157,7 @@ export class ChatController implements ChatHandlers {
             }
 
             metric.setDimension('codewhispererCustomizationArn', requestInput.conversationState?.customizationArn)
-            this.#telemetryController.emitAddMessageMetric(params.tabId, metric.metric)
+            await this.#telemetryController.emitAddMessageMetric(params.tabId, metric.metric)
 
             this.#telemetryController.updateTriggerInfo(params.tabId, {
                 lastMessageTrigger: {
@@ -200,26 +200,47 @@ export class ChatController implements ChatHandlers {
             return
         }
 
-        const cursorPosition = params.cursorPosition
+        let cursorPosition = params.cursorPosition
 
         const indentRange = {
             start: { line: cursorPosition.line, character: 0 },
             end: cursorPosition,
         }
         const documentContent = await this.#features.workspace.getTextDocument(params.textDocument.uri)
-        let indent = documentContent?.getText(indentRange)
-        if (indent && indent.trim().length !== 0) {
-            indent = ' '.repeat(indent.length - indent.trimStart().length)
+        // linePrefix is the raw text that is between the start of the line and the current cursor position
+        let linePrefix = documentContent?.getText(indentRange)
+        // calculatedIndent is the indent we calculate inside this function and apply to the text to be inserted
+        let calculatedIndent = ''
+        let hasVirtualSpace = false
+
+        if (linePrefix) {
+            // If linePrefix object is not empty, there are two possibilities:
+            // Case 1: If linePrefix contains only whitespace: Use the entire linePrefix as is for the indent
+            // Case 2: If linePrefix contains non-whitespace characters: Extract leading whitespace from linePrefix (if any), ignore rest of text
+            calculatedIndent =
+                linePrefix.trim().length == 0
+                    ? linePrefix
+                    : ' '.repeat(linePrefix.length - linePrefix.trimStart().length)
+        } else if (documentContent && cursorPosition.character > 0) {
+            // When the cursor is not at the start of the line (position > 0) but there's no actual text at the indentation range
+            // It means there are virtual spaces that is being rendered by the IDE
+            // In this case, the indentation is determined by the cursorPosition
+            this.#log('Indent is nullish and the cursor position is greater than zero while inserting code')
+            calculatedIndent = ' '.repeat(cursorPosition.character)
+            hasVirtualSpace = true
+            cursorPosition.character = 0
         }
 
-        let textWithIndent = ''
-        params.code.split('\n').forEach((line, index) => {
-            if (index === 0) {
-                textWithIndent += line
-            } else {
-                textWithIndent += '\n' + indent + line
-            }
-        })
+        const textWithIndent = params.code
+            .split('\n')
+            .map((line, index) => {
+                if (index === 0) {
+                    return hasVirtualSpace && line ? calculatedIndent + line : line
+                }
+                // Only indent non-empty lines
+                return line ? calculatedIndent + line : ''
+            })
+            .join('\n')
 
         const workspaceEdit: ApplyWorkspaceEditParams = {
             edit: {
@@ -352,7 +373,7 @@ export class ChatController implements ChatHandlers {
         // this is the only way we can detect a follow up action
         // we can reuse previous trigger information
         if (lastMessageTrigger?.followUpActions?.has(params.prompt?.prompt ?? '')) {
-            this.#telemetryController.emitInteractWithMessageMetric(params.tabId, {
+            await this.#telemetryController.emitInteractWithMessageMetric(params.tabId, {
                 cwsprChatMessageId: lastMessageTrigger.messageId!,
                 cwsprChatInteractionType: ChatInteractionType.ClickFollowUp,
             })
@@ -392,7 +413,7 @@ export class ChatController implements ChatHandlers {
             }
 
             if (!isNullish(partialResultToken)) {
-                this.#features.lsp.sendProgress(chatRequestType, partialResultToken, result.data.chatResult)
+                await this.#features.lsp.sendProgress(chatRequestType, partialResultToken, result.data.chatResult)
             }
         }
 

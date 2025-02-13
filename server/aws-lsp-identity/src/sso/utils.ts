@@ -1,11 +1,11 @@
 import { AwsErrorCodes, SsoSession } from '@aws/language-server-runtimes/server-interface'
-import { AwsError } from '../awsError'
 import { CreateTokenCommandOutput, SSOOIDC, SSOOIDCClientConfig } from '@aws-sdk/client-sso-oidc'
 import { SsoClientRegistration } from './cache'
 import { SSOToken } from '@smithy/shared-ini-file-loader'
 import { readFileSync } from 'fs'
 import { NodeHttpHandler } from '@smithy/node-http-handler'
 import { HttpsProxyAgent } from 'https-proxy-agent'
+import { AwsError } from '@aws/lsp-core'
 
 const proxyUrl = process.env.HTTPS_PROXY ?? process.env.https_proxy
 const certs = process.env.AWS_CA_BUNDLE ? readFileSync(process.env.AWS_CA_BUNDLE) : undefined
@@ -63,7 +63,8 @@ export function throwOnInvalidSsoSession(
         throwOnInvalidClientName(ssoSession.name) ||
         !ssoSession.settings ||
         !ssoSession.settings.sso_region?.trim() ||
-        !ssoSession.settings.sso_start_url?.trim()
+        !ssoSession.settings.sso_start_url?.trim() ||
+        !ssoSession.settings.sso_registration_scopes?.length
     ) {
         throw new AwsError('SSO session is invalid.', AwsErrorCodes.E_INVALID_SSO_SESSION)
     }

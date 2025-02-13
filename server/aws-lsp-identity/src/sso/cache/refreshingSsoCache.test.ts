@@ -6,10 +6,10 @@ import * as ssoUtils from '../utils'
 import { RefreshingSsoCache } from './refreshingSsoCache'
 import { SSOOIDC } from '@aws-sdk/client-sso-oidc'
 import { SSOToken } from '@smithy/shared-ini-file-loader'
-import { Observability } from '../../language-server/utils'
 import { Logging, Telemetry } from '@aws/language-server-runtimes/server-interface'
+import { Observability } from '@aws/lsp-core'
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+// eslint-disable-next-line
 use(require('chai-as-promised'))
 
 let ssoOidc: SSOOIDC & Disposable
@@ -123,13 +123,20 @@ describe('RefreshingSsoCache', () => {
             expect(actual).to.be.undefined
         })
 
-        it('Returns nothing on expired SSO token.', async () => {
+        it('Returns refreshed token on expired SSO token.', async () => {
             const ssoCache = stubSsoCache(createSsoClientRegistration(10000), createSsoToken(-10000))
             const sut = new RefreshingSsoCache(ssoCache, _ => {}, observability)
 
             const actual = await sut.getSsoToken('my-client-name', ssoSession)
 
-            expect(actual).to.be.undefined
+            expect(actual).not.to.be.empty
+            expect(actual?.accessToken).to.equal('new-access-token')
+            expect(actual?.clientId).to.equal('existing-client-id')
+            expect(actual?.clientSecret).to.equal('existing-client-secret')
+            expect(actual!.expiresAt).not.to.be.empty
+            expect(actual?.refreshToken).to.equal('new-refresh-token')
+            expect(actual?.region).to.equal('us-east-1')
+            expect(actual?.startUrl).to.equal('https://nowhere')
         })
 
         it('Returns existing SSO token before refresh window (5 minutes before expiration).', async () => {

@@ -7,13 +7,14 @@ import {
 import { ConfiguredRetryStrategy } from '@aws-sdk/util-retry'
 import { CredentialsProvider } from '@aws/language-server-runtimes/server-interface'
 import { getBearerTokenFromProvider } from '../utils'
-import { AWS_Q_REGION, AWS_Q_ENDPOINT_URL } from '../../constants'
+import { SDKInitializator } from '@aws/language-server-runtimes/server-interface'
 
 export type ChatSessionServiceConfig = CodeWhispererStreamingClientConfig
 export class ChatSessionService {
     public shareCodeWhispererContentWithAWS = false
-    readonly #codeWhispererRegion = AWS_Q_REGION
-    readonly #codeWhispererEndpoint = AWS_Q_ENDPOINT_URL
+    readonly #codeWhispererRegion: string
+    readonly #codeWhispererEndpoint: string
+    #sdkInitializator: SDKInitializator
     #abortController?: AbortController
     #credentialsProvider: CredentialsProvider
     #config?: CodeWhispererStreamingClientConfig
@@ -27,8 +28,17 @@ export class ChatSessionService {
         this.#conversationId = value
     }
 
-    constructor(credentialsProvider: CredentialsProvider, config?: CodeWhispererStreamingClientConfig) {
+    constructor(
+        credentialsProvider: CredentialsProvider,
+        codeWhispererRegion: string,
+        codeWhispererEndpoint: string,
+        sdkInitializator: SDKInitializator,
+        config?: CodeWhispererStreamingClientConfig
+    ) {
         this.#credentialsProvider = credentialsProvider
+        this.#codeWhispererRegion = codeWhispererRegion
+        this.#codeWhispererEndpoint = codeWhispererEndpoint
+        this.#sdkInitializator = sdkInitializator
         this.#config = config
     }
 
@@ -39,7 +49,7 @@ export class ChatSessionService {
             request.conversationState.conversationId = this.#conversationId
         }
 
-        const client = new CodeWhispererStreaming({
+        const client = this.#sdkInitializator(CodeWhispererStreaming, {
             region: this.#codeWhispererRegion,
             endpoint: this.#codeWhispererEndpoint,
             token: () => Promise.resolve({ token: getBearerTokenFromProvider(this.#credentialsProvider) }),

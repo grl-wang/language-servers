@@ -1,4 +1,4 @@
-import { CredentialsProvider } from '@aws/language-server-runtimes/server-interface'
+import { CredentialsProvider, SDKInitializator } from '@aws/language-server-runtimes/server-interface'
 import { Result } from '../types'
 import { ChatSessionService, ChatSessionServiceConfig } from './chatSessionService'
 
@@ -8,6 +8,9 @@ export class ChatSessionManagementService {
     #credentialsProvider?: CredentialsProvider
     #clientConfig?: ChatSessionServiceConfig | (() => ChatSessionServiceConfig) = {}
     #customUserAgent?: string = '%Amazon-Q-For-LanguageServers%'
+    #codeWhispererRegion?: string
+    #codeWhispererEndpoint?: string
+    #sdkInitializator?: SDKInitializator
 
     public static getInstance() {
         if (!ChatSessionManagementService.#instance) {
@@ -35,6 +38,24 @@ export class ChatSessionManagementService {
         return this
     }
 
+    public withCodeWhispererRegion(codeWhispererRegion: string) {
+        this.#codeWhispererRegion = codeWhispererRegion
+
+        return this
+    }
+
+    public withCodeWhispererEndpoint(codeWhispererEndpoint: string) {
+        this.#codeWhispererEndpoint = codeWhispererEndpoint
+
+        return this
+    }
+
+    public withSdkRuntimeConfigurator(sdkInitializator: SDKInitializator) {
+        this.#sdkInitializator = sdkInitializator
+
+        return this
+    }
+
     public setCustomUserAgent(customUserAgent: string) {
         this.#customUserAgent = customUserAgent
     }
@@ -49,6 +70,21 @@ export class ChatSessionManagementService {
                 success: false,
                 error: 'Credentials provider is not set',
             }
+        } else if (!this.#codeWhispererRegion) {
+            return {
+                success: false,
+                error: 'CodeWhispererRegion is not set',
+            }
+        } else if (!this.#codeWhispererEndpoint) {
+            return {
+                success: false,
+                error: 'CodeWhispererEndpoint is not set',
+            }
+        } else if (!this.#sdkInitializator) {
+            return {
+                success: false,
+                error: 'SdkInitializator is not set',
+            }
         } else if (this.#sessionByTab.has(tabId)) {
             return {
                 success: true,
@@ -57,10 +93,16 @@ export class ChatSessionManagementService {
         }
 
         const clientConfig = typeof this.#clientConfig === 'function' ? this.#clientConfig() : this.#clientConfig
-        const newSession = new ChatSessionService(this.#credentialsProvider, {
-            ...clientConfig,
-            customUserAgent: this.#customUserAgent,
-        })
+        const newSession = new ChatSessionService(
+            this.#credentialsProvider,
+            this.#codeWhispererRegion,
+            this.#codeWhispererEndpoint,
+            this.#sdkInitializator,
+            {
+                ...clientConfig,
+                customUserAgent: this.#customUserAgent,
+            }
+        )
 
         this.#sessionByTab.set(tabId, newSession)
 

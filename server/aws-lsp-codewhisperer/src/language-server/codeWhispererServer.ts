@@ -12,6 +12,8 @@ import {
     Server,
     Telemetry,
     TextDocument,
+    Workspace,
+    SDKInitializator,
 } from '@aws/language-server-runtimes/server-interface'
 import { AWSError } from 'aws-sdk'
 import { autoTrigger, triggerType } from './auto-trigger/autoTrigger'
@@ -38,6 +40,7 @@ import { fetchSupplementalContext } from './utilities/supplementalContextUtil/su
 import { undefinedIfEmpty } from './utilities/textUtils'
 import { TelemetryService } from './telemetryService'
 import { AcceptedSuggestionEntry, CodeDiffTracker } from './telemetry/codeDiffTracker'
+import { DEFAULT_AWS_Q_ENDPOINT_URL, DEFAULT_AWS_Q_REGION } from '../constants'
 
 const EMPTY_RESULT = { sessionId: '', items: [] }
 export const CONTEXT_CHARACTERS_LIMIT = 10240
@@ -155,7 +158,7 @@ const emitPerceivedLatencyTelemetry = (telemetry: Telemetry, session: CodeWhispe
     })
 }
 
-const emitUserTriggerDecisionTelemetry = (
+const emitUserTriggerDecisionTelemetry = async (
     telemetry: Telemetry,
     telemetryService: TelemetryService,
     session: CodeWhispererSession,
@@ -171,7 +174,7 @@ const emitUserTriggerDecisionTelemetry = (
         return
     }
 
-    emitAggregatedUserTriggerDecisionTelemetry(telemetryService, session, timeSinceLastUserModification)
+    await emitAggregatedUserTriggerDecisionTelemetry(telemetryService, session, timeSinceLastUserModification)
     emitUserDecisionTelemetry(telemetry, session)
 
     session.reportedUserDecision = true
@@ -182,7 +185,7 @@ const emitAggregatedUserTriggerDecisionTelemetry = (
     session: CodeWhispererSession,
     timeSinceLastUserModification?: number
 ) => {
-    telemetryService.emitUserTriggerDecision(session, timeSinceLastUserModification)
+    return telemetryService.emitUserTriggerDecision(session, timeSinceLastUserModification)
 }
 
 const emitUserDecisionTelemetry = (telemetry: Telemetry, session: CodeWhispererSession) => {
@@ -257,18 +260,39 @@ interface AcceptedInlineSuggestionEntry extends AcceptedSuggestionEntry {
 }
 
 export const CodewhispererServerFactory =
-    (service: (credentials: CredentialsProvider) => CodeWhispererServiceBase): Server =>
-    ({ credentialsProvider, lsp, workspace, telemetry, logging, runtime }) => {
+    (
+        service: (
+            credentials: CredentialsProvider,
+            workspace: Workspace,
+            awsQRegion: string,
+            awsQEndpointUrl: string,
+            sdkInitializator: SDKInitializator
+        ) => CodeWhispererServiceBase
+    ): Server =>
+    ({ credentialsProvider, lsp, workspace, telemetry, logging, runtime, sdkInitializator }) => {
         let lastUserModificationTime: number
         let timeSinceLastUserModification: number = 0
 
         const sessionManager = SessionManager.getInstance()
-        const codeWhispererService = service(credentialsProvider)
+
+        const awsQRegion = runtime.getConfiguration('AWS_Q_REGION') ?? DEFAULT_AWS_Q_REGION
+        const awsQEndpointUrl = runtime.getConfiguration('AWS_Q_ENDPOINT_URL') ?? DEFAULT_AWS_Q_ENDPOINT_URL
+        const codeWhispererService = service(
+            credentialsProvider,
+            workspace,
+            awsQRegion,
+            awsQEndpointUrl,
+            sdkInitializator
+        )
         const telemetryService = new TelemetryService(
             credentialsProvider,
             codeWhispererService.getCredentialsType(),
             telemetry,
-            logging
+            logging,
+            workspace,
+            awsQRegion,
+            awsQEndpointUrl,
+            sdkInitializator
         )
 
         lsp.addInitializer((params: InitializeParams) => {
@@ -295,8 +319,8 @@ export const CodewhispererServerFactory =
         const codeDiffTracker: CodeDiffTracker<AcceptedInlineSuggestionEntry> = new CodeDiffTracker(
             workspace,
             logging,
-            (entry: AcceptedInlineSuggestionEntry, percentage, unmodifiedAcceptedCharacterCount) => {
-                telemetryService.emitUserModificationEvent({
+            async (entry: AcceptedInlineSuggestionEntry, percentage, unmodifiedAcceptedCharacterCount) => {
+                await telemetryService.emitUserModificationEvent({
                     sessionId: entry.sessionId,
                     requestId: entry.requestId,
                     languageId: entry.languageId,
@@ -363,30 +387,33 @@ export const CodewhispererServerFactory =
                 ) {
                     return EMPTY_RESULT
                 }
-                const supplementalContext = await fetchSupplementalContext(
-                    textDocument,
-                    params.position,
-                    workspace,
-                    logging,
-                    token
-                )
 
-                const requestContext: GenerateSuggestionsRequest = {
+                // supplementalContext available only via token authentication
+                const supplementalContextPromise =
+                    codeWhispererService instanceof CodeWhispererServiceToken
+                        ? fetchSupplementalContext(textDocument, params.position, workspace, logging, token)
+                        : Promise.resolve(undefined)
+
+                let requestContext: GenerateSuggestionsRequest = {
                     fileContext,
                     maxResults,
-                    supplementalContexts: supplementalContext?.supplementalContextItems
+                }
+
+                const supplementalContext = await supplementalContextPromise
+                if (codeWhispererService instanceof CodeWhispererServiceToken) {
+                    requestContext.supplementalContexts = supplementalContext?.supplementalContextItems
                         ? supplementalContext.supplementalContextItems.map(v => ({
                               content: v.content,
                               filePath: v.filePath,
                           }))
-                        : [],
+                        : []
                 }
 
                 // Close ACTIVE session and record Discard trigger decision immediately
                 if (currentSession && currentSession.state === 'ACTIVE') {
                     // Emit user trigger decision at session close time for active session
                     sessionManager.discardSession(currentSession)
-                    emitUserTriggerDecisionTelemetry(
+                    await emitUserTriggerDecisionTelemetry(
                         telemetry,
                         telemetryService,
                         currentSession,
@@ -421,7 +448,7 @@ export const CodewhispererServerFactory =
                                 .replaceAll('\r\n', '\n'),
                         },
                     })
-                    .then(suggestionResponse => {
+                    .then(async suggestionResponse => {
                         codePercentageTracker.countInvocation(inferredLanguageId)
 
                         // Populate the session with information from codewhisperer response
@@ -440,7 +467,7 @@ export const CodewhispererServerFactory =
                         if (newSession.state === 'CLOSED' || newSession.state === 'DISCARD') {
                             // Force Discard user decision on every received suggestion
                             newSession.suggestions.forEach(s => newSession.setSuggestionState(s.itemId, 'Discard'))
-                            emitUserTriggerDecisionTelemetry(
+                            await emitUserTriggerDecisionTelemetry(
                                 telemetry,
                                 telemetryService,
                                 newSession,
@@ -500,7 +527,7 @@ export const CodewhispererServerFactory =
                         // If after all server-side filtering no suggestions can be displayed, close session and return empty results
                         if (suggestionsWithRightContext.length === 0) {
                             sessionManager.closeSession(newSession)
-                            emitUserTriggerDecisionTelemetry(
+                            await emitUserTriggerDecisionTelemetry(
                                 telemetry,
                                 telemetryService,
                                 newSession,
@@ -588,7 +615,7 @@ export const CodewhispererServerFactory =
 
             // Always emit user trigger decision at session close
             sessionManager.closeSession(session)
-            emitUserTriggerDecisionTelemetry(telemetry, telemetryService, session, timeSinceLastUserModification)
+            await emitUserTriggerDecisionTelemetry(telemetry, telemetryService, session, timeSinceLastUserModification)
         }
 
         const updateConfiguration = async () => {
@@ -601,9 +628,9 @@ export const CodewhispererServerFactory =
                         `Inline completion configuration updated to use ${codeWhispererService.customizationArn}`
                     )
                     /*
-                        The flag enableTelemetryEventsToDestination is set to true temporarily. It's value will be determined through destination
-                        configuration post all events migration to STE. It'll be replaced by qConfig['enableTelemetryEventsToDestination'] === true
-                     */
+                                                    The flag enableTelemetryEventsToDestination is set to true temporarily. It's value will be determined through destination
+                                                    configuration post all events migration to STE. It'll be replaced by qConfig['enableTelemetryEventsToDestination'] === true
+                                                 */
                     // const enableTelemetryEventsToDestination = true
                     // telemetryService.updateEnableTelemetryEventsToDestination(enableTelemetryEventsToDestination)
                     const optOutTelemetryPreference = qConfig['optOutTelemetry'] === true ? 'OPTOUT' : 'OPTIN'
@@ -654,15 +681,17 @@ export const CodewhispererServerFactory =
 
         logging.log('Amazon Q Inline Suggestion server has been initialised')
 
-        return () => {
+        return async () => {
             codePercentageTracker.dispose()
-            codeDiffTracker.shutdown()
+            await codeDiffTracker.shutdown()
         }
     }
 
 export const CodeWhispererServerIAM = CodewhispererServerFactory(
-    credentialsProvider => new CodeWhispererServiceIAM(credentialsProvider)
+    (credentialsProvider, workspace, awsQRegion, awsQEndpointUrl, sdkInitializator) =>
+        new CodeWhispererServiceIAM(credentialsProvider, workspace, awsQRegion, awsQEndpointUrl, sdkInitializator)
 )
 export const CodeWhispererServerToken = CodewhispererServerFactory(
-    credentialsProvider => new CodeWhispererServiceToken(credentialsProvider)
+    (credentialsProvider, workspace, awsQRegion, awsQEndpointUrl, sdkInitializator) =>
+        new CodeWhispererServiceToken(credentialsProvider, workspace, awsQRegion, awsQEndpointUrl, sdkInitializator)
 )

@@ -6,54 +6,71 @@ import { CodeWhispererServiceIAM, CodeWhispererServiceToken } from './codeWhispe
 import { QNetTransformServerToken } from './netTransformServer'
 import { QChatServer } from './qChatServer'
 import { QConfigurationServerToken } from './configuration/qConfigurationServer'
-import { readFileSync } from 'fs'
-import { HttpsProxyAgent } from 'hpagent'
-import { NodeHttpHandler } from '@smithy/node-http-handler'
 
-export const CodeWhispererServerTokenProxy = CodewhispererServerFactory(credentialsProvider => {
-    return new CodeWhispererServiceToken(credentialsProvider)
-})
-
-export const CodeWhispererServerIAMProxy = CodewhispererServerFactory(credentialsProvider => {
-    return new CodeWhispererServiceIAM(credentialsProvider)
-})
-
-export const CodeWhispererSecurityScanServerTokenProxy = SecurityScanServerToken(credentialsProvider => {
-    return new CodeWhispererServiceToken(credentialsProvider)
-})
-
-export const QNetTransformServerTokenProxy = QNetTransformServerToken(credentialsProvider => {
-    return new CodeWhispererServiceToken(credentialsProvider)
-})
-
-export const QChatServerProxy = QChatServer(credentialsProvider => {
-    let clientOptions: ChatSessionServiceConfig | undefined
-
-    const proxyUrl = process.env.HTTPS_PROXY ?? process.env.https_proxy
-    const certs = process.env.AWS_CA_BUNDLE ? [readFileSync(process.env.AWS_CA_BUNDLE)] : undefined
-
-    if (proxyUrl) {
-        clientOptions = () => {
-            // this mimics aws-sdk-v3-js-proxy
-            const agent = new HttpsProxyAgent({
-                proxy: proxyUrl,
-                ca: certs,
-            })
-
-            return {
-                requestHandler: new NodeHttpHandler({
-                    httpAgent: agent,
-                    httpsAgent: agent,
-                }),
-            }
-        }
+export const CodeWhispererServerTokenProxy = CodewhispererServerFactory(
+    (credentialsProvider, workspace, awsQRegion, awsQEndpointUrl, sdkInitializator) => {
+        return new CodeWhispererServiceToken(
+            credentialsProvider,
+            workspace,
+            awsQRegion,
+            awsQEndpointUrl,
+            sdkInitializator
+        )
     }
+)
 
+export const CodeWhispererServerIAMProxy = CodewhispererServerFactory(
+    (credentialsProvider, workspace, awsQRegion, awsQEndpointUrl, sdkInitializator) => {
+        return new CodeWhispererServiceIAM(
+            credentialsProvider,
+            workspace,
+            awsQRegion,
+            awsQEndpointUrl,
+            sdkInitializator
+        )
+    }
+)
+
+export const CodeWhispererSecurityScanServerTokenProxy = SecurityScanServerToken(
+    (credentialsProvider, workspace, awsQRegion, awsQEndpointUrl, sdkInitializator) => {
+        return new CodeWhispererServiceToken(
+            credentialsProvider,
+            workspace,
+            awsQRegion,
+            awsQEndpointUrl,
+            sdkInitializator
+        )
+    }
+)
+
+export const QNetTransformServerTokenProxy = QNetTransformServerToken(
+    (credentialsProvider, workspace, awsQRegion, awsQEndpointUrl, sdkInitializator) => {
+        return new CodeWhispererServiceToken(
+            credentialsProvider,
+            workspace,
+            awsQRegion,
+            awsQEndpointUrl,
+            sdkInitializator
+        )
+    }
+)
+
+export const QChatServerProxy = QChatServer((credentialsProvider, awsQRegion, awsQEndpointUrl, sdkInitializator) => {
     return ChatSessionManagementService.getInstance()
         .withCredentialsProvider(credentialsProvider)
-        .withConfig(clientOptions)
+        .withCodeWhispererEndpoint(awsQEndpointUrl)
+        .withCodeWhispererRegion(awsQRegion)
+        .withSdkRuntimeConfigurator(sdkInitializator)
 })
 
-export const QConfigurationServerTokenProxy = QConfigurationServerToken(credentialsProvider => {
-    return new CodeWhispererServiceToken(credentialsProvider)
-})
+export const QConfigurationServerTokenProxy = QConfigurationServerToken(
+    (credentialsProvider, workspace, awsQRegion, awsQEndpointUrl, sdkInitializator) => {
+        return new CodeWhispererServiceToken(
+            credentialsProvider,
+            workspace,
+            awsQRegion,
+            awsQEndpointUrl,
+            sdkInitializator
+        )
+    }
+)
