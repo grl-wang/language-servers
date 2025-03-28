@@ -69,34 +69,64 @@ export const QConfigurationServerToken =
                 let customizations: Customizations
                 let developerProfiles: AmazonQDeveloperProfile[]
 
+                logging.log(
+                    `[DEBUG onGetConfigurationFromServer] Client requested configurations at section ${section}`
+                )
+
                 try {
                     switch (section) {
                         case Q_CONFIGURATION_SECTION:
+                            logging.log(
+                                `[DEBUG onGetConfigurationFromServer] Fetching all configurations for section ${section}`
+                            )
                             ;[customizations, developerProfiles] = await Promise.all([
                                 serverConfigurationProvider.listAvailableCustomizations(),
                                 serverConfigurationProvider.listAvailableProfiles(),
                             ])
 
+                            logging.log(
+                                `[DEBUG onGetConfigurationFromServer] Fetched settings: ${JSON.stringify({ customizations, developerProfiles })}`
+                            )
+
                             return amazonQServiceManager.getEnableDeveloperProfileSupport()
                                 ? { customizations, developerProfiles }
                                 : { customizations }
                         case Q_CUSTOMIZATIONS_CONFIGURATION_SECTION:
+                            logging.log(
+                                `[DEBUG onGetConfigurationFromServer] Fetching only customizations [${section}]`
+                            )
                             customizations = await serverConfigurationProvider.listAvailableCustomizations()
+
+                            logging.log(
+                                `[DEBUG onGetConfigurationFromServer] Fetched customizations: ${JSON.stringify({ customizations })}`
+                            )
 
                             return customizations
                         case Q_DEVELOPER_PROFILES_CONFIGURATION_SECTION:
+                            logging.log(
+                                `[DEBUG onGetConfigurationFromServer] Fetching only Developer Profiles [${section}]`
+                            )
                             developerProfiles = await serverConfigurationProvider.listAvailableProfiles()
+
+                            logging.log(
+                                `[DEBUG onGetConfigurationFromServer] Fetched developerProfiles: ${JSON.stringify({ developerProfiles })}`
+                            )
 
                             return developerProfiles
                         default:
                             break
                     }
                 } catch (error) {
+                    logging.log(
+                        `[DEBUG onGetConfigurationFromServer] Error onGetConfigurationFromServer (${params.section}): ${JSON.stringify(error)}`
+                    )
                     if (error instanceof ResponseError) {
                         throw error
                     }
 
-                    logging.error(`Failed to fetch resources for section ${section}: ${error}`)
+                    logging.log(
+                        `[DEBUG onGetConfigurationFromServer] Failed to fetch resources for section ${section}: ${error}`
+                    )
                     throw new ResponseError(
                         LSPErrorCodes.RequestFailed,
                         `An unexpected error occured while fetching resource(s) for section: ${section}`
