@@ -13,6 +13,7 @@ import {
     TextEdit,
     chatRequestType,
     InlineChatParams,
+    SaveChatToFileParams,
 } from '@aws/language-server-runtimes/protocol'
 import {
     CancellationToken,
@@ -55,7 +56,14 @@ import { AmazonQWorkspaceConfig } from '../../shared/amazonQServiceManager/confi
 
 type ChatHandlers = Omit<
     LspHandlers<Chat>,
-    'openTab' | 'sendChatUpdate' | 'onFileClicked' | 'onInlineChatPrompt' | 'sendContextCommands' | 'onCreatePrompt'
+    | 'openTab'
+    | 'sendChatUpdate'
+    | 'onFileClicked'
+    | 'onInlineChatPrompt'
+    | 'sendContextCommands'
+    | 'onCreatePrompt'
+    | 'onListConversations'
+    | 'onConversationClick'
 >
 
 export class AgenticChatController implements ChatHandlers {
@@ -471,6 +479,19 @@ export class AgenticChatController implements ChatHandlers {
                 }
             default:
                 return {}
+        }
+    }
+
+    async onSaveConversationToFile(params: SaveChatToFileParams) {
+        try {
+            await this.#features.workspace.fs.writeFile(params.uri, params.serializedChat)
+
+            return {
+                tabId: params.tabId,
+                success: true,
+            }
+        } catch (error) {
+            throw new ResponseError(LSPErrorCodes.RequestFailed, 'Error processing suggestion requests')
         }
     }
 

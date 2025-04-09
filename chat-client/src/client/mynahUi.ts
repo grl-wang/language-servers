@@ -8,6 +8,7 @@ import {
     ErrorParams,
     GenericCommandParams,
     InsertToCursorPositionParams,
+    SaveChatParams,
     SendToPromptParams,
     TriggerType,
     isValidAuthFollowUpType,
@@ -30,6 +31,7 @@ import {
     MynahUIDataModel,
     NotificationType,
     MynahUIProps,
+    MynahIcons,
 } from '@aws/mynah-ui'
 import { VoteParams } from '../contracts/telemetry'
 import { Messager } from './messager'
@@ -45,9 +47,12 @@ export interface InboundChatApi {
     showError(params: ErrorParams): void
     openTab(params: OpenTabParams): void
     sendContextCommands(params: ContextCommandParams): void
+    saveChat(params: SaveChatParams): void
 }
 
 type ContextCommandGroups = MynahUIDataModel['contextCommands']
+export const VIEW_HISTORY_BUTTON_ID = 'history_sheet'
+export const EXPORT_CHAT_BUTTON_ID = 'export_chat'
 
 const ContextPrompt = {
     CreateItemId: 'create-saved-prompt',
@@ -172,8 +177,10 @@ export const createMynahUi = (
             messager.onTabAdd(initialTabId)
         },
         onTabAdd: (tabId: string) => {
+            const tabBarDefaultData = tabFactory.getDefaultTabData()
             const defaultTabConfig: Partial<MynahUIDataModel> = {
-                quickActionCommands: tabFactory.getDefaultTabData().quickActionCommands,
+                quickActionCommands: tabBarDefaultData.quickActionCommands,
+                tabBarButtons: tabBarDefaultData.tabBarButtons,
                 contextCommands: contextCommandGroups,
                 ...(disclaimerCardActive ? { promptInputStickyCard: disclaimerCard } : {}),
             }
@@ -323,6 +330,20 @@ export const createMynahUi = (
             return false
         },
 
+        onTabBarButtonClick: (tabId: string, buttonId: string) => {
+            if (buttonId === VIEW_HISTORY_BUTTON_ID) {
+                console.error('Handler for View History button is not implemented')
+            } else if (buttonId === EXPORT_CHAT_BUTTON_ID) {
+                // Trigger Export chat action
+                // When export triggered from TabBarButton, currently opened tab is always passed as selected
+
+                // TODO: open tab if it is closed will be needed for action button from Chat History list
+
+                // Send command to Extension to open Save History dialog
+                messager.onExportChat({ tabId })
+            }
+        },
+
         // Noop not-implemented handlers
         onBeforeTabRemove: undefined,
         onFileActionClick: undefined,
@@ -333,7 +354,6 @@ export const createMynahUi = (
         onShowMoreWebResultsClick: undefined,
         onFormLinkClick: undefined,
         onFormModifierEnterPress: undefined,
-        onTabBarButtonClick: undefined,
     }
 
     let mynahUiProps: MynahUIProps = {
@@ -545,12 +565,30 @@ ${params.message}`,
     }
 
     const sendContextCommands = (params: ContextCommandParams) => {
+        // @ts-ignore
         contextCommandGroups = params.contextCommandGroups
 
         Object.keys(mynahUi.getAllTabs()).forEach(tabId => {
             mynahUi.updateStore(tabId, {
                 contextCommands: contextCommandGroups,
             })
+        })
+    }
+
+    const saveChat = (params: SaveChatParams) => {
+        // User will select target file for saving history with IDE-specific dialog.
+        // Chat client and Language Server can do the rest for saving.
+
+        // Serialize chat
+        const serializedChat = mynahUi.serializeChat(params.tabId, params.format)
+
+        // Send saveChat message
+        // https://github.com/aws/aws-toolkit-vscode/blob/191c50488418c2ddecb830fbc26f2063257acc33/packages/core/src/codewhispererChat/view/messages/messageListener.ts#L130
+        // Could delegate writing file to filesystem to language server
+        messager.onSaveChatToFile({
+            tabId: params.tabId,
+            uri: params.uri,
+            serializedChat,
         })
     }
 
@@ -561,6 +599,7 @@ ${params.message}`,
         showError: showError,
         openTab: openTab,
         sendContextCommands: sendContextCommands,
+        saveChat: saveChat,
     }
 
     return [mynahUi, api]

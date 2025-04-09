@@ -44,6 +44,8 @@ describe('MynahUI', () => {
             disclaimerAcknowledged: sinon.stub(),
             onOpenTab: sinon.stub(),
             createPrompt: sinon.stub(),
+            exportChatDialog: sinon.stub(),
+            saveChatToFile: sinon.stub(),
         }
 
         messager = new Messager(outboundChatApi)

@@ -1,5 +1,7 @@
-import { ChatItemType, MynahUIDataModel, QuickActionCommandGroup } from '@aws/mynah-ui'
+import { ChatItemType, MynahIcons, MynahUIDataModel, QuickActionCommandGroup, TabBarMainAction } from '@aws/mynah-ui'
 import { disclaimerCard } from '../texts/disclaimer'
+import { HistoryOptions } from '../chat'
+import { EXPORT_CHAT_BUTTON_ID, VIEW_HISTORY_BUTTON_ID } from '../mynahUi'
 
 export type DefaultTabData = MynahUIDataModel
 
@@ -13,7 +15,8 @@ export class TabFactory {
 
     constructor(
         private defaultTabData: DefaultTabData,
-        private quickActionCommands?: QuickActionCommandGroup[]
+        private quickActionCommands?: QuickActionCommandGroup[],
+        private historyOptions?: HistoryOptions
     ) {}
 
     public createTab(needWelcomeMessages: boolean, disclaimerCardActive: boolean): MynahUIDataModel {
@@ -42,10 +45,15 @@ export class TabFactory {
         this.quickActionCommands = [...(this.quickActionCommands ?? []), ...quickActionCommands]
     }
 
+    public updateHistoryOptions(options: HistoryOptions) {
+        this.historyOptions = options
+    }
+
     public getDefaultTabData(): DefaultTabData {
         return {
             ...this.defaultTabData,
             ...(this.quickActionCommands ? { quickActionCommands: this.quickActionCommands } : {}),
+            tabBarButtons: this.getHistoryTabBarActions(),
         }
     }
 
@@ -64,5 +72,27 @@ export class TabFactory {
                 },
             ],
         }
+    }
+
+    private getHistoryTabBarActions(): TabBarMainAction[] {
+        const tabBarActions = []
+
+        if (this.historyOptions?.view) {
+            tabBarActions.push({
+                id: VIEW_HISTORY_BUTTON_ID,
+                icon: MynahIcons.COMMENT,
+                description: 'View chat history',
+            })
+        }
+
+        if (this.historyOptions?.export) {
+            tabBarActions.push({
+                id: EXPORT_CHAT_BUTTON_ID,
+                icon: MynahIcons.EXTERNAL,
+                description: 'Export chat',
+            })
+        }
+
+        return tabBarActions
     }
 }

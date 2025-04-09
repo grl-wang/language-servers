@@ -18,6 +18,7 @@ import {
     ErrorResult,
     InsertToCursorPositionParams,
     SendToPromptParams,
+    ShowExportChatDialogParams,
     TriggerType,
 } from '@aws/chat-client-ui-types'
 import {
@@ -29,9 +30,11 @@ import {
     LinkClickParams,
     OpenTabResult,
     QuickActionParams,
+    SaveChatToFileParams,
     SourceLinkClickParams,
     TabAddParams,
     TabChangeParams,
+    TabEventParams,
     TabRemoveParams,
 } from '@aws/language-server-runtimes-types'
 import { TelemetryParams } from '../contracts/serverContracts'
@@ -51,6 +54,13 @@ import {
     VOTE_TELEMETRY_EVENT,
     VoteParams,
 } from '../contracts/telemetry'
+
+// export interface ExportChatDialogParams extends TabEventParams {}
+
+// export interface SaveChatToFileParams extends TabEventParams {
+//     uri: string,
+//     serializedChat: string
+// }
 
 /**
  * OutboundChatApi defines the interface for sending messages from the chat client
@@ -75,6 +85,8 @@ export interface OutboundChatApi {
     disclaimerAcknowledged(): void
     onOpenTab(result: OpenTabResult | ErrorResult): void
     createPrompt(params: CreatePromptParams): void
+    exportChatDialog(params: ShowExportChatDialogParams): void
+    saveChatToFile(params: SaveChatToFileParams): void
 }
 
 export class Messager {
@@ -176,5 +188,13 @@ export class Messager {
 
     onCreatePrompt = (promptName: string): void => {
         this.chatApi.createPrompt({ promptName })
+    }
+
+    onExportChat = (params: ShowExportChatDialogParams) => {
+        this.chatApi.exportChatDialog(params)
+    }
+
+    onSaveChatToFile = (params: SaveChatToFileParams) => {
+        this.chatApi.saveChatToFile(params)
     }
 }

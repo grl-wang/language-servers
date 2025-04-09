@@ -4,6 +4,7 @@ import {
     AUTH_FOLLOW_UP_CLICKED,
     CHAT_OPTIONS,
     COPY_TO_CLIPBOARD,
+    SHOW_EXPORT_CHAT_DIALOG,
 } from '@aws/chat-client-ui-types'
 import {
     ChatResult,
@@ -18,6 +19,7 @@ import {
     InlineChatResult,
     inlineChatRequestType,
     contextCommandsNotificationType,
+    saveConversationToFileRequestType,
 } from '@aws/language-server-runtimes/protocol'
 import { v4 as uuidv4 } from 'uuid'
 import { Uri, Webview, WebviewView, commands, window } from 'vscode'
@@ -40,6 +42,45 @@ export function registerChat(languageClient: LanguageClient, extensionUri: Uri, 
                     languageClient.info(`[VSCode Client]  Received ${JSON.stringify(message)} from chat`)
 
                     switch (message.command) {
+                        case SHOW_EXPORT_CHAT_DIALOG:
+                            const defaultFileName = `q-dev-chat-${new Date().toISOString().split('T')[0]}.md`
+                            const defaultUri = vscode.Uri.file(defaultFileName)
+                            const saveUri = await vscode.window.showSaveDialog({
+                                filters: {
+                                    Markdown: ['md'],
+                                    HTML: ['html'],
+                                },
+                                defaultUri,
+                                title: 'Export chat',
+                            })
+
+                            if (!saveUri) {
+                                languageClient.error('Export chat failed: save destination was not selected')
+                                break
+                            }
+
+                            const format = saveUri.fsPath.endsWith('.md') ? 'markdown' : 'html'
+                            languageClient.info('Saving chat to ', saveUri)
+
+                            // Send command to Chat Client
+                            webviewView.webview.postMessage({
+                                command: 'saveChat',
+                                params: {
+                                    tabId: message.params.tabId,
+                                    uri: saveUri.fsPath,
+                                    format,
+                                },
+                            })
+
+                            break
+                        case saveConversationToFileRequestType.method:
+                            languageClient.info(
+                                'TODO: Save serialized chat to disk. Either do it here, or delegate to Language Server'
+                            )
+
+                            languageClient.sendRequest(message.command, message.params)
+
+                            break
                         case COPY_TO_CLIPBOARD:
                             languageClient.info('[VSCode Client] Copy to clipboard event received')
                             break

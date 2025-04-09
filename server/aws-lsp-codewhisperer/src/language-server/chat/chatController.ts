@@ -5,6 +5,9 @@ import {
     FeedbackParams,
     InlineChatParams,
     InsertToCursorPositionParams,
+    RequestHandler,
+    SaveChatToFileParams,
+    SaveChatToFileResult,
     TextDocumentEdit,
     TextEdit,
     chatRequestType,
@@ -50,7 +53,14 @@ import { AmazonQTokenServiceManager } from '../../shared/amazonQServiceManager/A
 
 type ChatHandlers = Omit<
     LspHandlers<Chat>,
-    'openTab' | 'sendChatUpdate' | 'onFileClicked' | 'onInlineChatPrompt' | 'sendContextCommands' | 'onCreatePrompt'
+    | 'openTab'
+    | 'sendChatUpdate'
+    | 'onFileClicked'
+    | 'onInlineChatPrompt'
+    | 'sendContextCommands'
+    | 'onCreatePrompt'
+    | 'onListConversations'
+    | 'onConversationClick'
 >
 
 export class ChatController implements ChatHandlers {
@@ -458,6 +468,19 @@ export class ChatController implements ChatHandlers {
                 }
             default:
                 return {}
+        }
+    }
+
+    async onSaveConversationToFile(params: SaveChatToFileParams) {
+        try {
+            await this.#features.workspace.fs.writeFile(params.uri, params.serializedChat)
+
+            return {
+                tabId: params.tabId,
+                success: true,
+            }
+        } catch (error) {
+            throw new ResponseError(LSPErrorCodes.RequestFailed, 'Error processing suggestion requests')
         }
     }
 

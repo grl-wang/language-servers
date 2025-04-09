@@ -28,11 +28,16 @@ import {
     DISCLAIMER_ACKNOWLEDGED,
     ErrorResult,
     UiResultMessage,
+    SHOW_EXPORT_CHAT_DIALOG,
+    ShowExportChatDialogParams,
+    SaveChatParams,
+    SAVE_CHAT_CONFIRMATION,
 } from '@aws/chat-client-ui-types'
 import {
     CHAT_REQUEST_METHOD,
     CONTEXT_COMMAND_NOTIFICATION_METHOD,
     CREATE_PROMPT_NOTIFICATION_METHOD,
+    ChatOptions,
     ChatParams,
     ContextCommandParams,
     CreatePromptParams,
@@ -58,6 +63,8 @@ import {
     TabAddParams,
     TabChangeParams,
     TabRemoveParams,
+    SAVE_CONVERSATION_TO_FILE_REQUEST_METHOD,
+    SaveChatToFileParams,
 } from '@aws/language-server-runtimes-types'
 import { MynahUIDataModel, MynahUITabStoreModel } from '@aws/mynah-ui'
 import { ServerMessage, TELEMETRY, TelemetryParams } from '../contracts/serverContracts'
@@ -73,7 +80,14 @@ const DEFAULT_TAB_DATA = {
     promptInputPlaceholder: 'Ask a question or enter "/" for quick actions',
 }
 
-type ChatClientConfig = Pick<MynahUIDataModel, 'quickActionCommands'> & { disclaimerAcknowledged?: boolean }
+type ChatClientConfig = Pick<MynahUIDataModel, 'quickActionCommands' | 'tabBarButtons'> & {
+    disclaimerAcknowledged?: boolean
+}
+
+export type HistoryOptions = {
+    view?: boolean
+    export?: boolean
+}
 
 export const createChat = (
     clientApi: { postMessage: (msg: UiMessage | UiResultMessage | ServerMessage) => void },
@@ -131,15 +145,31 @@ export const createChat = (
             case CONTEXT_COMMAND_NOTIFICATION_METHOD:
                 mynahApi.sendContextCommands(message.params as ContextCommandParams)
                 break
+            case SAVE_CHAT_CONFIRMATION:
+                console.log('Save chat with', message.params)
+
+                mynahApi.saveChat(message.params as SaveChatParams)
+                break
             case CHAT_OPTIONS: {
                 const params = (message as ChatOptionsMessage).params
+
                 if (params?.quickActions?.quickActionsCommandGroups) {
+                    // @ts-ignore
                     tabFactory.updateQuickActionCommands(params?.quickActions?.quickActionsCommandGroups)
                 }
 
+                if (params?.history) {
+                    tabFactory.updateHistoryOptions(params.history)
+                }
+
                 const allExistingTabs: MynahUITabStoreModel = mynahUi.getAllTabs()
+                const defaultTabData = tabFactory.getDefaultTabData()
+                mynahUi.updateTabDefaults({
+                    store: defaultTabData,
+                })
+
                 for (const tabId in allExistingTabs) {
-                    mynahUi.updateStore(tabId, tabFactory.getDefaultTabData())
+                    mynahUi.updateStore(tabId, defaultTabData)
                 }
                 break
             }
@@ -223,6 +253,15 @@ export const createChat = (
         },
         createPrompt: (params: CreatePromptParams) => {
             sendMessageToClient({ command: CREATE_PROMPT_NOTIFICATION_METHOD, params })
+        },
+        exportChatDialog: function (params: ShowExportChatDialogParams): void {
+            sendMessageToClient({
+                command: SHOW_EXPORT_CHAT_DIALOG,
+                params,
+            })
+        },
+        saveChatToFile: function (params: SaveChatToFileParams): void {
+            sendMessageToClient({ command: SAVE_CONVERSATION_TO_FILE_REQUEST_METHOD, params })
         },
     }
 

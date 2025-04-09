@@ -1,4 +1,4 @@
-import { InitializeParams, Server } from '@aws/language-server-runtimes/server-interface'
+import { InitializeParams, LSPErrorCodes, ResponseError, Server } from '@aws/language-server-runtimes/server-interface'
 import { ChatController } from './chatController'
 import { ChatSessionManagementService } from './chatSessionManagementService'
 import { CLEAR_QUICK_ACTION, HELP_QUICK_ACTION } from './quickActions'
@@ -11,7 +11,7 @@ import { safeGet } from '../../shared/utils'
 export const QChatServer =
     // prettier-ignore
     (): Server => features => {
-        const { chat, credentialsProvider, telemetry, logging, lsp, runtime } = features
+        const { chat, credentialsProvider, telemetry, logging, lsp, runtime, workspace } = features
 
         let amazonQServiceManager: AmazonQTokenServiceManager
         let chatController: ChatController
@@ -29,6 +29,10 @@ export const QChatServer =
                                     commands: [HELP_QUICK_ACTION, CLEAR_QUICK_ACTION],
                                 },
                             ],
+                        },
+                        history: {
+                            view: true,
+                            export: true,
                         },
                     },
                 },
@@ -108,6 +112,10 @@ export const QChatServer =
 
         chat.onCodeInsertToCursorPosition(params => {
             return chatController.onCodeInsertToCursorPosition(params)
+        })
+
+        chat.onSaveConversationToFile(params => {
+            return chatController.onSaveConversationToFile(params)
         })
 
         logging.log('Q Chat server has been initialized')
