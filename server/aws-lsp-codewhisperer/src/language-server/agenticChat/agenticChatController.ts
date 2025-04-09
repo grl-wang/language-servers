@@ -484,7 +484,7 @@ export class AgenticChatController implements ChatHandlers {
 
     async onSaveConversationToFile(params: SaveChatToFileParams) {
         try {
-            await this.#features.workspace.fs.writeFile(params.uri, params.serializedChat)
+            await this.#features.workspace.fs.writeFile(params.filePath, params.serializedChat)
 
             return {
                 tabId: params.tabId,
@@ -589,7 +589,7 @@ export class AgenticChatController implements ChatHandlers {
 
     updateConfiguration = (newConfig: AmazonQWorkspaceConfig) => {
         this.#customizationArn = newConfig.customizationArn
-        this.#log(`Chat configuration updated to use ${this.#customizationArn}`)
+        this.#log(`Chat configuration updated customizationArn to ${this.#customizationArn}`)
         /*
             The flag enableTelemetryEventsToDestination is set to true temporarily. It's value will be determined through destination
             configuration post all events migration to STE. It'll be replaced by qConfig['enableTelemetryEventsToDestination'] === true

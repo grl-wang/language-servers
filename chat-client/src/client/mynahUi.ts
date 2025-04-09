@@ -15,6 +15,7 @@ import {
 } from '@aws/chat-client-ui-types'
 import {
     ChatResult,
+    ContextCommand,
     ContextCommandParams,
     FeedbackParams,
     FollowUpClickParams,
@@ -32,6 +33,7 @@ import {
     NotificationType,
     MynahUIProps,
     MynahIcons,
+    QuickActionCommand,
 } from '@aws/mynah-ui'
 import { VoteParams } from '../contracts/telemetry'
 import { Messager } from './messager'
@@ -39,6 +41,7 @@ import { TabFactory } from './tabs/tabFactory'
 import { disclaimerAcknowledgeButtonId, disclaimerCard } from './texts/disclaimer'
 import { ChatClientAdapter, ChatEventHandler } from '../contracts/chatClientAdapter'
 import { withAdapter } from './withAdapter'
+import { toMynahIcon } from './utils'
 
 export interface InboundChatApi {
     addChatResponse(params: ChatResult, tabId: string, isPartialResult: boolean): void
@@ -175,6 +178,9 @@ export const createMynahUi = (
         onReady: () => {
             messager.onUiReady()
             messager.onTabAdd(initialTabId)
+        },
+        onFileClick: (tabId: string, filePath: string) => {
+            messager.onFileClick({ tabId, filePath })
         },
         onTabAdd: (tabId: string) => {
             const tabBarDefaultData = tabFactory.getDefaultTabData()
@@ -343,20 +349,9 @@ export const createMynahUi = (
                 messager.onExportChat({ tabId })
             }
         },
-
-        // Noop not-implemented handlers
-        onBeforeTabRemove: undefined,
-        onFileActionClick: undefined,
-        onStopChatResponse: undefined,
-        onFileClick: undefined,
-        onQuickCommandGroupActionClick: undefined,
-        onChatItemEngagement: undefined,
-        onShowMoreWebResultsClick: undefined,
-        onFormLinkClick: undefined,
-        onFormModifierEnterPress: undefined,
     }
 
-    let mynahUiProps: MynahUIProps = {
+    const mynahUiProps: MynahUIProps = {
         tabs: {
             [initialTabId]: {
                 isSelected: true,
@@ -564,9 +559,22 @@ ${params.message}`,
         }
     }
 
+    const toContextCommands = (commands: ContextCommand[]): QuickActionCommand[] => {
+        return commands.map(command => ({
+            ...command,
+            children: command.children?.map(child => ({
+                ...child,
+                commands: toContextCommands(child.commands),
+            })),
+            icon: toMynahIcon(command.icon),
+        }))
+    }
+
     const sendContextCommands = (params: ContextCommandParams) => {
-        // @ts-ignore
-        contextCommandGroups = params.contextCommandGroups
+        contextCommandGroups = params.contextCommandGroups.map(group => ({
+            ...group,
+            commands: toContextCommands(group.commands),
+        }))
 
         Object.keys(mynahUi.getAllTabs()).forEach(tabId => {
             mynahUi.updateStore(tabId, {
@@ -587,7 +595,7 @@ ${params.message}`,
         // Could delegate writing file to filesystem to language server
         messager.onSaveChatToFile({
             tabId: params.tabId,
-            uri: params.uri,
+            filePath: params.filePath,
             serializedChat,
         })
     }

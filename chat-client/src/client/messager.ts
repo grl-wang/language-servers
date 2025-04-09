@@ -25,6 +25,7 @@ import {
     ChatParams,
     CreatePromptParams,
     FeedbackParams,
+    FileClickParams,
     FollowUpClickParams,
     InfoLinkClickParams,
     LinkClickParams,
@@ -45,6 +46,7 @@ import {
     ENTER_FOCUS,
     ERROR_MESSAGE_TELEMETRY_EVENT,
     EXIT_FOCUS,
+    FILE_CLICK_TELEMETRY_EVENT,
     INFO_LINK_CLICK_TELEMETRY_EVENT,
     INSERT_TO_CURSOR_POSITION_TELEMETRY_EVENT,
     LINK_CLICK_TELEMETRY_EVENT,
@@ -87,6 +89,7 @@ export interface OutboundChatApi {
     createPrompt(params: CreatePromptParams): void
     exportChatDialog(params: ShowExportChatDialogParams): void
     saveChatToFile(params: SaveChatToFileParams): void
+    fileClick(params: FileClickParams): void
 }
 
 export class Messager {
@@ -196,5 +199,10 @@ export class Messager {
 
     onSaveChatToFile = (params: SaveChatToFileParams) => {
         this.chatApi.saveChatToFile(params)
+    }
+
+    onFileClick = (params: FileClickParams): void => {
+        this.chatApi.telemetry({ ...params, name: FILE_CLICK_TELEMETRY_EVENT })
+        this.chatApi.fileClick(params)
     }
 }
