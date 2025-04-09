@@ -24,6 +24,7 @@ import { registerIdentity } from './identityActivation'
 import { registerNotification } from './notificationActivation'
 import { registerQProfileSelection } from './selectQProfileActivation'
 import { registerAwsQSection } from './awsQSectionActivation'
+import { registerEditSuggestions } from './editSuggestionsActivation'
 
 export async function activateDocumentsLanguageServer(extensionContext: ExtensionContext) {
     /**
@@ -51,6 +52,14 @@ export async function activateDocumentsLanguageServer(extensionContext: Extensio
      * from the language server.
      */
     const enableInlineCompletion = process.env.ENABLE_INLINE_COMPLETION === 'true'
+
+    /**
+     * If you are iterating with a language server that uses edit suggestions,
+     * set the ENABLE_EDIT_SUGGESTIONS environment variable to "true".
+     * This will set up the extension's edit suggestions provider to get suggestions
+     * from the language server.
+     */
+    const enableEditSuggestions = process.env.ENABLE_EDIT_SUGGESTIONS === 'true'
 
     /**
      * If you are iterating with a language server that uses credentials...
@@ -186,6 +195,10 @@ export async function activateDocumentsLanguageServer(extensionContext: Extensio
 
     if (enableInlineCompletion) {
         registerInlineCompletion(client)
+    }
+
+    if (enableEditSuggestions) {
+        registerEditSuggestions(client)
     }
 
     const enableCustomCommands = process.env.ENABLE_CUSTOM_COMMANDS === 'true'

@@ -24,6 +24,10 @@ export interface Suggestion extends CodeWhispererTokenClient.Completion, CodeWhi
     itemId: string
 }
 
+// TODO: Update GenerateSuggestionsRequest interface when API is updated to include:
+// - predictionTypes field to specify edit suggestions vs completions
+// - editorState field for editor context
+// - Update supplementalContexts to include type and metadata fields
 export interface GenerateSuggestionsRequest
     extends CodeWhispererTokenClient.GenerateCompletionsRequest,
         CodeWhispererSigv4Client.GenerateRecommendationsRequest {
@@ -38,6 +42,9 @@ export interface ResponseContext {
     nextToken?: string
 }
 
+// TODO: Update GenerateSuggestionsResponse interface when API is updated to include:
+// - predictions field that can contain both completions and edits
+// - Add handling for the new Edit structure
 export interface GenerateSuggestionsResponse {
     suggestions: Suggestion[]
     responseContext: ResponseContext
@@ -196,6 +203,10 @@ export class CodeWhispererServiceToken extends CodeWhispererServiceBase {
         // add error check
         if (this.customizationArn) request.customizationArn = this.customizationArn
 
+        // TODO: When API is updated, modify this method to:
+        // 1. Set predictionTypes to include "EDITS" when requesting edit suggestions
+        // 2. Format supplementalContexts with type and metadata fields for temporal data
+        // 3. Handle the new predictions field in the response that contains both completions and edits
         const response = await this.client.generateCompletions(this.withProfileArn(request)).promise()
         const responseContext = {
             requestId: response?.$response?.requestId,
