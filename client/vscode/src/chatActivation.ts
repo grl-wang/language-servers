@@ -64,10 +64,10 @@ export function registerChat(languageClient: LanguageClient, extensionUri: Uri, 
 
                             // Send command to Chat Client
                             webviewView.webview.postMessage({
-                                command: 'saveChat',
+                                command: 'saveChatConfirmation',
                                 params: {
                                     tabId: message.params.tabId,
-                                    uri: saveUri.fsPath,
+                                    filepath: saveUri.fsPath,
                                     format,
                                 },
                             })
@@ -78,7 +78,8 @@ export function registerChat(languageClient: LanguageClient, extensionUri: Uri, 
                                 'TODO: Save serialized chat to disk. Either do it here, or delegate to Language Server'
                             )
 
-                            languageClient.sendRequest(message.command, message.params)
+                            // languageClient.sendRequest(message.command, message.params)
+                            const format = saveUri.fsPath.endsWith('.md') ? 'markdown' : 'html'
 
                             break
                         case COPY_TO_CLIPBOARD:

@@ -438,6 +438,7 @@ export const createMynahUi = (
 
         if (isPartialResult) {
             // type for MynahUI differs from ChatResult types so we ignore it
+            // @ts-ignore
             mynahUi.updateLastChatAnswer(tabId, { ...chatResultWithoutType, header: header })
             return
         }
@@ -455,6 +456,7 @@ export const createMynahUi = (
             followUpOptions[0].type &&
             isValidAuthFollowUpType(followUpOptions[0].type)
         if (chatResult.body === '' && isValidAuthFollowUp) {
+            // @ts-ignore
             mynahUi.addChatItem(tabId, {
                 type: ChatItemType.SYSTEM_PROMPT,
                 ...chatResultWithoutType, // type for MynahUI differs from ChatResult types so we ignore it
@@ -477,6 +479,7 @@ export const createMynahUi = (
             header: header,
             body: chatResult.body,
             messageId: chatResult.messageId,
+            // @ts-ignore
             followUp: followUps,
             relatedContent: chatResult.relatedContent,
             canBeVoted: chatResult.canBeVoted,

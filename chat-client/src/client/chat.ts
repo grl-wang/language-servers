@@ -28,10 +28,7 @@ import {
     DISCLAIMER_ACKNOWLEDGED,
     ErrorResult,
     UiResultMessage,
-    SHOW_EXPORT_CHAT_DIALOG,
-    ShowExportChatDialogParams,
-    SaveChatParams,
-    SAVE_CHAT_CONFIRMATION,
+    SAVE_CONVERSATION_TO_FILE_DIALOG,
 } from '@aws/chat-client-ui-types'
 import {
     CHAT_REQUEST_METHOD,
@@ -263,9 +260,9 @@ export const createChat = (
         createPrompt: (params: CreatePromptParams) => {
             sendMessageToClient({ command: CREATE_PROMPT_NOTIFICATION_METHOD, params })
         },
-        exportChatDialog: function (params: ShowExportChatDialogParams): void {
+        exportChatDialog: function (params: SaveChatToFileParams): void {
             sendMessageToClient({
-                command: SHOW_EXPORT_CHAT_DIALOG,
+                command: SAVE_CONVERSATION_TO_FILE_DIALOG,
                 params,
             })
         },
