@@ -35,6 +35,7 @@ import {
     CONVERSATION_CLICK_REQUEST_METHOD,
     CREATE_PROMPT_NOTIFICATION_METHOD,
     ChatParams,
+    ChatResult,
     ContextCommandParams,
     ConversationClickParams,
     ConversationClickResult,
@@ -128,7 +129,7 @@ export const createChat = (
 
         switch (message?.command) {
             case CHAT_REQUEST_METHOD:
-                mynahApi.addChatResponse(message.params, message.tabId, message.isPartialResult)
+                mynahApi.addChatResponse(message.params as ChatResult, message.tabId, message.isPartialResult)
                 break
             case OPEN_TAB_REQUEST_METHOD:
                 mynahApi.openTab(message.requestId, message.params as OpenTabParams)

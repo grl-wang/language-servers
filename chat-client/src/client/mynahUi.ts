@@ -36,6 +36,8 @@ import {
     NotificationType,
     MynahUIProps,
     QuickActionCommand,
+    ChatItemContent,
+    MynahIcons,
 } from '@aws/mynah-ui'
 import { VoteParams } from '../contracts/telemetry'
 import { Messager } from './messager'
@@ -412,7 +414,7 @@ export const createMynahUi = (
 
     const addChatResponse = (chatResult: ChatResult, tabId: string, isPartialResult: boolean) => {
         const { type, ...chatResultWithoutType } = chatResult
-        let header = undefined
+        let header: ChatItemContent['header'] = undefined
 
         if (chatResult.contextList !== undefined) {
             header = {
@@ -444,9 +446,68 @@ export const createMynahUi = (
             }
         }
 
+        // @ts-ignore
+        if (chatResult.type === 'tool_answer') {
+            chatResultWithoutType.canBeVoted = false
+            chatResultWithoutType.followUp = undefined
+            if (!header) header = {}
+            if (header) {
+                // @ts-ignore
+                header.icon = chatResult.icon
+                // @ts-ignore
+                // header.buttons = chatResult.buttons
+                if (chatResultWithoutType.status === 'progress') {
+                    header.status = {
+                        icon: MynahIcons.PROGRESS,
+                        text: 'Working',
+                        status: 'warning',
+                    }
+                    // @ts-ignore
+                } else if (chatResultWithoutType.status === 'success') {
+                    header.status = {
+                        icon: MynahIcons.OK,
+                        text: 'Complete',
+                        status: 'success',
+                    }
+                    // @ts-ignore
+                } else if (chatResultWithoutType.status === 'error') {
+                    header.status = {
+                        icon: MynahIcons.CANCEL,
+                        text: 'Error',
+                        status: 'error',
+                    }
+                }
+            }
+        }
+
         if (isPartialResult) {
             // type for MynahUI differs from ChatResult types so we ignore it
-            mynahUi.updateLastChatAnswer(tabId, { ...chatResultWithoutType, header: header })
+            // TODO: Update not last, but message by ID.
+            // If new message - add new message
+            // If message exists - update by Id
+            // Technically we can jsut update based on card type
+
+            // @ts-ignore - if message does not exist, update last answer
+            if (!mynahUi.chatWrappers[tabId].getChatItem(chatResult.messageId)) {
+                // TODO: we need to support different UI for each tool based on designs: read/write files, shell commands, etc.
+                // Check all tools and expected UI
+                mynahUi.addChatItem(tabId, {
+                    type: ChatItemType.ANSWER,
+                    fullWidth: true,
+                    padding: false,
+                    ...chatResultWithoutType,
+                    header: header,
+                })
+            } else {
+                mynahUi.updateChatAnswerWithMessageId(tabId, chatResult.messageId!, {
+                    type: ChatItemType.ANSWER,
+                    fullWidth: true,
+                    padding: false,
+                    ...chatResultWithoutType,
+                    header: header,
+                })
+            }
+
             return
         }
 

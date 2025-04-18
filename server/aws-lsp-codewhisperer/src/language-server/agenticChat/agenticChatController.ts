@@ -14,7 +14,7 @@ import {
     ToolResultContentBlock,
     ToolUse,
 } from '@amzn/codewhisperer-streaming'
-import { chatRequestType, InlineChatResultParams } from '@aws/language-server-runtimes/protocol'
+import { ChatMessage, chatRequestType, InlineChatResultParams } from '@aws/language-server-runtimes/protocol'
 import {
     ApplyWorkspaceEditParams,
     ErrorCodes,
@@ -162,6 +162,10 @@ export class AgenticChatController implements ChatHandlers {
         )
     }
 
+    // TODO: Consider if we need to return all stored ChatResults in response as an array
+    // This will be breaking change in API and should be places behind a flag
+    // Returning 1 (first or last) message could be also ok,
+    // if we correctly resolve all in-progress messages that appeared during processing request and tools calls
     async onChatPrompt(params: ChatParams, token: CancellationToken): Promise<ChatResult | ResponseError<ChatResult>> {
         // Phase 1: Initial Setup - This happens only once
         const maybeDefaultResponse = getDefaultChatResponse(params.prompt.prompt)
@@ -297,7 +301,7 @@ export class AgenticChatController implements ChatHandlers {
             this.#debug(`Response received for iteration ${iterationCount}:`, JSON.stringify(response.$metadata))
 
             // Phase 4: Response Processing
-            const result = await this.#processGenerateAssistantResponseResponse(
+            const result = await this.#processGenerateAssistantResponse(
                 response,
                 metric.mergeWith({
                     cwsprChatResponseCode: response.$metadata.httpStatusCode,
@@ -381,11 +385,51 @@ export class AgenticChatController implements ChatHandlers {
     ): Promise<ToolResult[]> {
         const results: ToolResult[] = []
 
+        // // Send all planned tools before the loop?
+        // for (const toolUse of toolUses) {
+        //     // TODO: more data will be passed with exetended protocol for ChatMessage
+        //     const toolChatEvent: ChatMessage = {
+        //         messageId: toolUse.toolUseId,
+        //         // @ts-ignore
+        //         type: 'tool_answer',
+        //         name: toolUse.name,
+        //         icon: 'progress',
+        //         // @ts-ignore
+        //         buttons: [{
+        //             id: 'stop',
+        //             status: 'clear',
+        //             icon: 'stop',
+        //         }],
+        //         body: `${executeToolMessage(toolUse)}`,
+        //     }
+        //     await chatResultStream.writeResultBlock(toolChatEvent)
+        // }
+
         for (const toolUse of toolUses) {
             if (!toolUse.name || !toolUse.toolUseId) continue
 
+            // TODO: more data will be passed with exetended protocol for ChatMessage
+            const toolChatEvent: ChatMessage = {
+                messageId: toolUse.toolUseId,
+                // @ts-ignore
+                type: 'tool_answer',
+                name: toolUse.name,
+                status: 'progress',
+                // @ts-ignore
+                // buttons: [{
+                //     id: 'stop',
+                //     status: 'clear',
+                //     icon: 'stop',
+                // }],
+                body: `${executeToolMessage(toolUse)}`,
+            }
+
             try {
-                await chatResultStream.writeResultBlock({ body: `${executeToolMessage(toolUse)}` })
+                // Instead of writing text, create new send new ChatMessage object back to chat client with unique ID.
+                // Make chat client to render or update incoming chat message by id.
+                await chatResultStream.writeResultBlock(toolChatEvent)
+
+                await new Promise(resolve => setTimeout(resolve, 4000))
 
                 const result = await this.#features.agent.runTool(toolUse.name, toolUse.input)
                 let toolResultContent: ToolResultContentBlock
@@ -403,12 +447,18 @@ export class AgenticChatController implements ChatHandlers {
                     status: 'success',
                     content: [toolResultContent],
                 })
-                await chatResultStream.writeResultBlock({ body: toolResultMessage(toolUse, result) })
+
+                toolChatEvent.body = toolResultMessage(toolUse, result)
+                // @ts-ignore
+                toolChatEvent.status = 'success'
+                await chatResultStream.writeResultBlock(toolChatEvent)
             } catch (err) {
                 const errMsg = err instanceof Error ? err.message : 'unknown error'
-                await chatResultStream.writeResultBlock({
-                    body: toolErrorMessage(toolUse, errMsg),
-                })
+
+                toolChatEvent.body = toolErrorMessage(toolUse, errMsg)
+                // @ts-ignore
+                toolChatEvent.status = 'error'
+                await chatResultStream.writeResultBlock(toolChatEvent)
                 this.#log(`Error running tool ${toolUse.name}:`, errMsg)
                 results.push({
                     toolUseId: toolUse.toolUseId,
@@ -515,7 +565,9 @@ export class AgenticChatController implements ChatHandlers {
             })
         }
 
-        return chatResultStream.getResult()
+        return chatResultStream.getResult()[0]
+        // Return 1 message in result for now, since it accumulates all of the metadata
+        // return result
     }
 
     /**
@@ -857,7 +909,7 @@ export class AgenticChatController implements ChatHandlers {
         return triggerContext
     }
 
-    async #processGenerateAssistantResponseResponse(
+    async #processGenerateAssistantResponse(
         response: GenerateAssistantResponseCommandOutput,
         metric: Metric<AddMessageEvent>,
         chatResultStream: AgenticChatResultStream,
@@ -865,6 +917,7 @@ export class AgenticChatController implements ChatHandlers {
     ): Promise<Result<AgenticChatResultWithMetadata, string>> {
         const requestId = response.$metadata.requestId!
         const chatEventParser = new AgenticChatEventParser(requestId, metric)
+        chatEventParser.canBeVoted = false
         const streamWriter = chatResultStream.getResultStreamWriter()
         for await (const chatEvent of response.generateAssistantResponseResponse!) {
             const result = chatEventParser.processPartialEvent(chatEvent, contextList)

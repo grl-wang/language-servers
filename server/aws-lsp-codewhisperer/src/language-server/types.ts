@@ -20,3 +20,14 @@ export type LspHandlers<THandlerMap> = {
 export type KeysMatching<TMap extends object, TCriteria> = {
     [TKey in keyof TMap]: TMap[TKey] extends TCriteria ? TKey : never
 }[keyof TMap]
+
+export type LspResponse<T = any> = {
+    jsonrpc: string
+    id: string | number | null
+    result?: T
+    error?: {
+        code: number
+        message: string
+        data?: any
+    }
+}

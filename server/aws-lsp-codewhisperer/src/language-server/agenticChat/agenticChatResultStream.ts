@@ -22,21 +22,44 @@ export class AgenticChatResultStream {
         this.#sendProgress = sendProgress
     }
 
-    getResult(): ChatResult {
-        return this.#joinResults(this.#state.chatResultBlocks)
+    getResult(): ChatResult[] {
+        return this.#state.chatResultBlocks
+        // return this.#joinResults(this.#state.chatResultBlocks)
     }
 
-    #joinResults(chatResults: ChatResult[]): ChatResult {
-        // TODO: if we add ui elements to ChatResult in the response, we need to be more aware of how we combine them.
-        return chatResults.reduceRight((acc, c) => ({
-            ...acc,
-            body: c.body + AgenticChatResultStream.resultDelimiter + acc.body,
-        }))
-    }
+    // #joinResults(chatResults: ChatResult[]): ChatResult[] {
+    //     // TODO: if we add ui elements to ChatResult in the response, we need to be more aware of how we combine them.
+    //     // return chatResults.reduceRight((acc, c) => ({
+    //     //     ...acc,
+    //     //     body: c.body + AgenticChatResultStream.resultDelimiter + acc.body,
+    //     // }))
+    //     return chatResults
+    // }
 
     async writeResultBlock(result: ChatResult) {
-        this.#state.chatResultBlocks.push(result)
-        await this.#sendProgress(this.getResult())
+        // this.#state.chatResultBlocks.push(result)
+
+        // Find and update item with by messageId in #state
+        // If it does not exist - push new item to the end
+        const index = this.#state.chatResultBlocks.findIndex(item => item.messageId === result.messageId!)
+
+        // Update message in store.
+        if (index !== -1) {
+            // Update existing item
+            this.#state.chatResultBlocks[index] = {
+                ...this.#state.chatResultBlocks[index],
+                ...result,
+            }
+
+            this.#sendProgress(this.#state.chatResultBlocks[index])
+        } else {
+            // Push new item to the end
+            this.#state.chatResultBlocks.push(result)
+
+            this.#sendProgress(result)
+        }
+
+        // await this.#sendProgress(this.getResult())
     }
 
     getResultStreamWriter(): ResultStreamWriter {
@@ -49,9 +72,10 @@ export class AgenticChatResultStream {
 
         return {
             write: async (intermediateChatResult: ChatResult) => {
-                const combinedResult = this.#joinResults([...this.#state.chatResultBlocks, intermediateChatResult])
+                // const combinedResult = this.#joinResults([...this.#state.chatResultBlocks, intermediateChatResult])
                 lastResult = intermediateChatResult
-                return await this.#sendProgress(combinedResult)
+
+                return await this.#sendProgress(lastResult)
             },
             close: async () => {
                 if (lastResult) {
