@@ -36,13 +36,17 @@ import { DocumentContextExtractor } from '../chat/contexts/documentContext'
 import * as utils from '../chat/utils'
 import { DEFAULT_HELP_FOLLOW_UP_PROMPT, HELP_MESSAGE } from '../chat/constants'
 import { TelemetryService } from '../../shared/telemetry/telemetryService'
-import { AmazonQTokenServiceManager } from '../../shared/amazonQServiceManager/AmazonQTokenServiceManager'
+import {
+    AmazonQServiceToken,
+    AmazonQTokenServiceManager,
+} from '../../shared/amazonQServiceManager/AmazonQTokenServiceManager'
 import { TabBarController } from './tabBarController'
 import { getUserPromptsDirectory } from './context/contextUtils'
 import { AdditionalContextProvider } from './context/addtionalContextProvider'
 import { ContextCommandsProvider } from './context/contextCommandsProvider'
 import { ChatDatabase } from './tools/chatDb/chatDb'
 import { LocalProjectContextController } from '../../shared/localProjectContextController'
+import { AmazonQServiceAPI } from '../../shared/amazonQServiceManager/BaseAmazonQServiceManager'
 
 describe('AgenticChatController', () => {
     const mockTabId = 'tab-1'
@@ -111,7 +115,7 @@ describe('AgenticChatController', () => {
     let emitConversationMetricStub: sinon.SinonStub
 
     let testFeatures: TestFeatures
-    let amazonQServiceManager: AmazonQTokenServiceManager
+    let amazonQService: AmazonQServiceToken
     let chatSessionManagementService: ChatSessionManagementService
     let chatController: AgenticChatController
     let telemetryService: TelemetryService
@@ -200,9 +204,10 @@ describe('AgenticChatController', () => {
 
         AmazonQTokenServiceManager.resetInstance()
 
-        amazonQServiceManager = AmazonQTokenServiceManager.getInstance(testFeatures)
+        AmazonQTokenServiceManager.initInstance(testFeatures)
+        amazonQService = new AmazonQServiceAPI(() => AmazonQTokenServiceManager.getInstance())
         chatSessionManagementService = ChatSessionManagementService.getInstance()
-        chatSessionManagementService.withAmazonQServiceManager(amazonQServiceManager)
+        chatSessionManagementService.withAmazonQService(amazonQService)
 
         const mockCredentialsProvider: CredentialsProvider = {
             hasCredentials: sinon.stub().returns(true),
@@ -223,12 +228,12 @@ describe('AgenticChatController', () => {
 
         getMessagesStub = sinon.stub(ChatDatabase.prototype, 'getMessages')
 
-        telemetryService = new TelemetryService(amazonQServiceManager, mockCredentialsProvider, telemetry, logging)
+        telemetryService = new TelemetryService(amazonQService, mockCredentialsProvider, telemetry, logging)
         chatController = new AgenticChatController(
             chatSessionManagementService,
             testFeatures,
             telemetryService,
-            amazonQServiceManager
+            amazonQService
         )
     })
 

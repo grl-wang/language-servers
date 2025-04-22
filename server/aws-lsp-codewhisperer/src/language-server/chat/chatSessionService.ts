@@ -3,13 +3,12 @@ import {
     GenerateAssistantResponseCommandInput,
     GenerateAssistantResponseCommandOutput,
 } from '@amzn/codewhisperer-streaming'
-
-import { AmazonQBaseServiceManager } from '../../shared/amazonQServiceManager/BaseAmazonQServiceManager'
 import {
     StreamingClientServiceToken,
     SendMessageCommandInput,
     SendMessageCommandOutput,
 } from '../../shared/streamingClientService'
+import { AmazonQServiceBase } from '../../shared/amazonQServiceManager/BaseAmazonQServiceManager'
 
 export type ChatSessionServiceConfig = CodeWhispererStreamingClientConfig
 
@@ -22,8 +21,8 @@ export class ChatSessionService {
     public pairProgrammingMode: boolean = true
     #abortController?: AbortController
     #conversationId?: string
-    #amazonQServiceManager?: AmazonQBaseServiceManager
     #deferredToolExecution: Record<string, DeferredHandler> = {}
+    #amazonQService?: AmazonQServiceBase
 
     public get conversationId(): string | undefined {
         return this.#conversationId
@@ -40,8 +39,8 @@ export class ChatSessionService {
         this.#deferredToolExecution[messageId] = { resolve, reject }
     }
 
-    constructor(amazonQServiceManager?: AmazonQBaseServiceManager) {
-        this.#amazonQServiceManager = amazonQServiceManager
+    constructor(amazonQService?: AmazonQServiceBase) {
+        this.#amazonQService = amazonQService
     }
 
     public async sendMessage(request: SendMessageCommandInput): Promise<SendMessageCommandOutput> {
@@ -51,11 +50,11 @@ export class ChatSessionService {
             request.conversationState.conversationId = this.#conversationId
         }
 
-        if (!this.#amazonQServiceManager) {
-            throw new Error('amazonQServiceManager is not initialized')
+        if (!this.#amazonQService) {
+            throw new Error('No AmazonQService has been attached')
         }
 
-        const client = this.#amazonQServiceManager.getStreamingClient()
+        const client = this.#amazonQService.getStreamingClient()
 
         const response = await client.sendMessage(request, this.#abortController)
 
@@ -71,11 +70,11 @@ export class ChatSessionService {
             request.conversationState.conversationId = this.#conversationId
         }
 
-        if (!this.#amazonQServiceManager) {
-            throw new Error('amazonQServiceManager is not initialized')
+        if (!this.#amazonQService) {
+            throw new Error('No AmazonQService has been attached')
         }
 
-        const client = this.#amazonQServiceManager.getStreamingClient()
+        const client = this.#amazonQService.getStreamingClient()
 
         if (client instanceof StreamingClientServiceToken) {
             const response = await client.generateAssistantResponse(request, this.#abortController)
